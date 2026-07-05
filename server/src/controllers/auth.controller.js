@@ -4,19 +4,18 @@ import Admin from "../models/admin.model.js";
 import Otp from "../models/otp.model.js";
 import { sendOtpEmail } from "../utils/mailer.js";
 import { signToken } from "../utils/token.js";
+import { connectDB } from "../config/db.js"; // <-- adjust path to match where your db.js actually lives
 
 dotenv.config();
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
-// Get admin emails from environment variable
 const adminEmails = (process.env.ADMIN_EMAILS || "")
   .split(",")
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
-console.log(adminEmails)
 function hashOtp(otp) {
   return crypto.createHash("sha256").update(otp).digest("hex");
 }
@@ -27,14 +26,14 @@ function generateOtp() {
 
 export async function sendOtp(req, res) {
   try {
+    await connectDB(); // <-- add this
+
     const email = String(req.body.email || "").toLowerCase().trim();
     if (!email) return res.status(400).json({ message: "email is required" });
 
-    // Check if email is an admin email
     if (!adminEmails.includes(email)) {
       return res.status(401).json({ message: "email not recognized" });
     }
-
 
     const recent = await Otp.findOne({ email }).sort({ createdAt: -1 });
     if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS) {
@@ -53,21 +52,21 @@ export async function sendOtp(req, res) {
     res.json({ message: "otp sent" });
   } catch (error) {
     console.error("Send OTP Error:", error);
-    res.status(500).json({ message: error.message});
+    res.status(500).json({ message: error.message });
   }
 }
 
 export async function verifyOtp(req, res) {
   try {
+    await connectDB(); // <-- add this
+
     const email = String(req.body.email || "").toLowerCase().trim();
     const otp = String(req.body.otp || "").trim();
     if (!email || !otp) return res.status(400).json({ message: "email and otp are required" });
 
-    // Check if email is an admin email
     if (!adminEmails.includes(email)) {
       return res.status(401).json({ message: "email not recognized" });
     }
-
 
     const record = await Otp.findOne({ email }).sort({ createdAt: -1 });
     if (!record) return res.status(404).json({ message: "otp not found, request a new one" });
@@ -90,18 +89,11 @@ export async function verifyOtp(req, res) {
 
     await record.deleteOne();
 
-    // Generate token with admin details
-    const token = signToken({ 
-      email: email, 
-      role: 'admin' 
-    });
+    const token = signToken({ email, role: "admin" });
 
-    res.json({ 
-      message: "logged in", 
-      token,
-    });
+    res.json({ message: "logged in", token });
   } catch (error) {
     console.error("Verify OTP Error:", error);
-    res.status(500).json({ message: error});
+    res.status(500).json({ message: error.message }); // <-- was `error`, fixed to `.message`
   }
 }
