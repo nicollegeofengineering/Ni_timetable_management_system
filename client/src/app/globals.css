@@ -1,0 +1,29 @@
+:root {
+  --navy-900: #0a2540;
+  --navy-800: #0f2f52;
+  --navy-700: #16406b;
+  --gold-500: #c9a227;
+  --gold-400: #d9b84a;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --border: #e2e5ea;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b7280;
+  --danger: #d64545;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}

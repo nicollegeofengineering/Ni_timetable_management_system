@@ -1,0 +1,432 @@
+.header{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.mcontainer{
+    display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  background-color: #f5f5f5;
+  flex-direction: column;
+}
+.container{
+  background-color: white;
+  width: 210mm;
+  height:297mm;
+  padding-top: 55px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  overflow: auto;
+}
+.headtop{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.headtop p{
+    
+    border:none;
+    font-size: 17px;
+    font-weight: bold;
+}
+.headbottom{
+    display: flex;
+    justify-content: space-between;
+    padding: 0px 40px;
+    align-items: right;
+    justify-content: right;
+    
+
+}
+.hbutton{
+    display: flex;
+    align-items: right;
+    justify-content: right;
+    width: 100%;
+    padding-right: 40px;
+    padding-top:20px;
+    gap: 10px;
+}
+.abutton{
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+}
+.abutton:hover{
+    background-color: #d32f2f;
+    cursor: pointer;
+}
+.abutton:active{
+    background-color: #b71c1c;
+}
+.pbutton{
+    background-color: #3db13b;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+}
+.pbutton:hover{
+    background-color: #2e8b2e;
+    cursor: pointer;
+}
+.pbutton:active{
+    background-color: #1e5e1e;
+}
+.filterSelect{
+    padding: 4px 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    width: 95px;
+
+}
+.wef{
+    font-size: 17px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.wef input{
+    border:none;
+    padding-top:3px;
+    font-size: 14px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-weight: bold;
+}
+.container input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.container input[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* ================= MASTER TIMETABLE (NEW CLASSES ONLY) ================= */
+
+.mtWrapper{
+    width: 100%;
+    padding: 20px 20px 0px 20px;
+    box-sizing: border-box;
+}
+
+.mtTable{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.mtTable th,
+.mtTable td{
+    border: 1px solid black;
+    text-align: center;
+    padding: 15px 3px;
+    vertical-align: middle;
+    font-size: 11px;
+}
+
+.mtTable thead th{
+    
+    font-weight: bold;
+    font-size: 9px;
+}
+
+.mtDayHead{
+    width: 40px;
+}
+
+.mtBranchHead{
+    width: 45px;
+}
+
+.mtDayCell{
+    font-weight: bold;
+    
+}
+.mtDayCellText{
+    display: inline-block;
+    transform: rotate(90deg);
+    white-space: nowrap;
+}
+
+.mtBranchCell{
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.mtPeriodCell{
+    min-width: 32px;
+    height: 24px;
+}
+
+.mtPeriodBox{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.1;
+}
+
+.mtSubjectCode{
+    font-weight: bold;
+    font-size: 9px;
+}
+
+.mtStaffCode{
+    font-size: 8px;
+    color: #444;
+}
+
+.mtBreakCell{
+    
+    width: 18px;
+}
+
+.mtBreakLabel{
+    display: inline-block;
+    transform: rotate(-90deg);
+    white-space: nowrap;
+    font-size: 8px;
+    font-weight: bold;
+   
+}
+
+.mtHallCell{
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.mtLoadingCell{
+    padding: 10px;
+    font-style: italic;
+    font-size: 11px;
+}
+
+/* ================= SUBJECT REFERENCE TABLE (NEW CLASSES ONLY) ================= */
+
+.srWrapper{
+    width: 100%;
+    padding: 15px 20px 20px 20px;
+    box-sizing: border-box;
+}
+
+.srTitle{
+    text-align: center;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+}
+
+.srTable{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.srTable th,
+.srTable td{
+    border: 1px solid black;
+    text-align: center;
+    padding: 10px 3px;
+    font-size: 11px;
+}
+
+.srTable thead th{
+    
+    font-weight: bold;
+}
+
+.srTable td{
+    height: 16px;
+}
+/* ================= INTERACTIVE CELL STATES (NEW) ================= */
+
+.mtSubjectCode,
+.mtStaffCode{
+    cursor: pointer;
+}
+
+
+
+.mtCellError{
+    border: 1px solid red !important;
+}
+
+.mtSuccessTick{
+    font-size: 8px;
+    color: #1e8e3e;
+    font-weight: bold;
+}
+
+.mtErrorMsg{
+    font-size: 7px;
+    color: red;
+    font-weight: bold;
+    line-height: 1.1;
+    max-width: 60px;
+    white-space: normal;
+}
+/* Disabled period cell */
+.mtPeriodDisabled {
+  
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+.mtPeriodDisabled:hover {
+  background-color: #f5f5f5 !important;
+}
+
+.mtDisabledText {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+/* ================= SEARCH POPUP (NEW) ================= */
+
+.mtPopupOverlay{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 1000;
+}
+
+.mtPopup{
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    width: 200px;
+    border-radius: 4px;
+    z-index: 1000;
+    font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.mtPopupSearch{
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    font-size: 12px;
+    border: none;
+    border-bottom: 1px solid #ddd;
+    outline: none;
+}
+
+.mtPopupList{
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.mtPopupItem{
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.mtPopupItem:hover{
+    background-color: #f0f4ff;
+}
+
+.mtPopupItemCode{
+    font-weight: bold;
+}
+
+.mtPopupItemName{
+    color: #555;
+    text-align: right;
+}
+
+.mtPopupEmpty{
+    padding: 10px;
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+}
+.mtPeriodDisabled {
+  background-color: #f5f5f5 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+.mtPeriodDisabled:hover {
+  background-color: #f5f5f5 !important;
+}
+
+.mtDisabledText {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+.sign{
+    display: flex;
+    justify-content: space-between;
+    padding: 0px 80px;
+    margin-top: 150px;
+    margin-bottom: 80px;
+    font-weight: bold;
+    font-size: 15px;
+
+}
+
+/* ================= PRINT STYLES (NEW) ================= */
+
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 0;
+    }
+
+    .mtPopupOverlay,
+    .mtSuccessTick,
+    .mtErrorMsg{
+        display: none;
+    }
+
+    .mcontainer{
+        background-color: white;
+        padding: 0;
+        margin: 0;
+        display: block;
+        width: auto;
+    }
+
+    .container{
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding-top: 20px;
+        box-shadow: none;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .mtTable,
+    .srTable{
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .pbutton{
+        display: none;
+    }
+}

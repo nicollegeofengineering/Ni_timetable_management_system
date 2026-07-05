@@ -1,0 +1,33 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.cardLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.cardValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--navy-900);
+  margin: 0;
+}
+
+.accent {
+  width: 32px;
+  height: 4px;
+  background: var(--gold-500);
+  border-radius: 4px;
+  margin-top: 12px;
+}

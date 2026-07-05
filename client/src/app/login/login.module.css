@@ -1,0 +1,90 @@
+.wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--navy-900), var(--navy-700));
+}
+
+.card {
+  width: 380px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 36px 32px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--navy-900);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 24px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--gold-500);
+}
+
+.button {
+  width: 100%;
+  padding: 11px;
+  border: none;
+  border-radius: 8px;
+  background: var(--navy-900);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--navy-800);
+}
+
+.error {
+  font-size: 13px;
+  color: var(--danger);
+  margin: -8px 0 16px;
+}
+
+.resend {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--navy-700);
+  text-align: center;
+  cursor: pointer;
+}
+
+.resend[data-disabled="true"] {
+  color: var(--text-secondary);
+  cursor: default;
+}
