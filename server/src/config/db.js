@@ -9,11 +9,9 @@ export async function connectDB() {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    mongoose.set("bufferCommands", false); // fail fast instead of hanging 10s
+    mongoose.set("bufferCommands", false);
     cached.promise = mongoose
-      .connect(process.env.MONGO_URI, {
-        dbName: "NICETECH",
-      })
+      .connect(process.env.MONGO_URI, { dbName: "NICETECH" })
       .then((m) => {
         console.log("Connected to MongoDB – database: NICETECH");
         return m;
@@ -23,7 +21,7 @@ export async function connectDB() {
   try {
     cached.conn = await cached.promise;
   } catch (err) {
-    cached.promise = null; // reset so next request can retry
+    cached.promise = null;
     console.error("MongoDB connection failed:", err.message);
     throw err;
   }
