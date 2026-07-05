@@ -1,17 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
+import { connectDB } from "../config/db.js"; // <-- added import
 const router = express.Router();
 
 import Hall_db from "../models/Hall.model.js";
-
-// In-memory cache
-let hall_cache = null;
-
-// Helper function to clear cache
-const clearCache = () => {
-  hall_cache = null;
-  console.log("Hall cache cleared");
-};
 
 /**
  * GET /api/hall/all
@@ -24,6 +16,8 @@ const clearCache = () => {
  */
 router.get("/all", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -31,12 +25,10 @@ router.get("/all", async (req, res) => {
     // Build filter
     const filter = {};
 
-    // Search by hallName (case-insensitive, partial match)
     if (req.query.search && req.query.search.trim()) {
       filter.hallName = { $regex: req.query.search.trim(), $options: "i" };
     }
 
-    // Filter by minimum capacity
     if (req.query.minCapacity) {
       const minCap = parseInt(req.query.minCapacity);
       if (!isNaN(minCap)) {
@@ -44,7 +36,6 @@ router.get("/all", async (req, res) => {
       }
     }
 
-    // Filter by maximum capacity
     if (req.query.maxCapacity) {
       const maxCap = parseInt(req.query.maxCapacity);
       if (!isNaN(maxCap)) {
@@ -52,7 +43,6 @@ router.get("/all", async (req, res) => {
       }
     }
 
-    // Execute queries in parallel
     const [halls, total] = await Promise.all([
       Hall_db.find(filter)
         .sort({ hallName: 1 })
@@ -89,6 +79,8 @@ router.get("/all", async (req, res) => {
  */
 router.get("/search/:term", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { term } = req.params;
 
     if (!term || !term.trim()) {
@@ -124,9 +116,10 @@ router.get("/search/:term", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { hallName, capacity } = req.body;
 
-    // Validate required fields
     if (!hallName || !hallName.trim()) {
       return res.status(400).json({
         success: false,
@@ -149,14 +142,12 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Format values
     const formattedHallName = hallName.trim();
 
-    // Check if hall name already exists
-    const existingHall = await Hall_db.findOne({ 
-      hallName: formattedHallName 
+    const existingHall = await Hall_db.findOne({
+      hallName: formattedHallName
     });
-    
+
     if (existingHall) {
       return res.status(409).json({
         success: false,
@@ -172,9 +163,6 @@ router.post("/", async (req, res) => {
     });
 
     await newHall.save();
-    
-    // Clear cache after adding new hall
-    clearCache();
 
     res.status(201).json({
       success: true,
@@ -183,8 +171,7 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating hall:", err);
-    
-    // Handle mongoose duplicate key error
+
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
       const value = err.keyValue[field];
@@ -210,10 +197,11 @@ router.post("/", async (req, res) => {
  */
 router.put("/:id", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { id } = req.params;
     const { hallName, capacity } = req.body;
 
-    // Validate ID
     if (!id) {
       return res.status(400).json({
         success: false,
@@ -221,7 +209,6 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -229,7 +216,6 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Find existing hall
     const existingHall = await Hall_db.findById(id);
     if (!existingHall) {
       return res.status(404).json({
@@ -238,18 +224,16 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Build update object
     const updateData = {};
 
     if (hallName && hallName.trim()) {
       const formattedHallName = hallName.trim();
-      
-      // Check if new hall name already exists (if different from current)
+
       if (formattedHallName !== existingHall.hallName) {
-        const hallExists = await Hall_db.findOne({ 
-          hallName: formattedHallName 
+        const hallExists = await Hall_db.findOne({
+          hallName: formattedHallName
         });
-        
+
         if (hallExists) {
           return res.status(409).json({
             success: false,
@@ -273,7 +257,6 @@ router.put("/:id", async (req, res) => {
       updateData.capacity = parsedCapacity;
     }
 
-    // If no fields to update
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
@@ -294,9 +277,6 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Clear cache after updating hall
-    clearCache();
-
     res.status(200).json({
       success: true,
       message: "Hall updated successfully",
@@ -305,7 +285,6 @@ router.put("/:id", async (req, res) => {
   } catch (err) {
     console.error("Error updating hall:", err);
 
-    // Handle mongoose duplicate key error
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
       const value = err.keyValue[field];
@@ -330,9 +309,10 @@ router.put("/:id", async (req, res) => {
  */
 router.delete("/:id", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { id } = req.params;
 
-    // Validate ID
     if (!id) {
       return res.status(400).json({
         success: false,
@@ -340,7 +320,6 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -357,9 +336,6 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Clear cache after deleting hall
-    clearCache();
-
     res.status(200).json({
       success: true,
       message: "Hall deleted successfully",
@@ -373,6 +349,5 @@ router.delete("/:id", async (req, res) => {
     });
   }
 });
-
 
 export default router;

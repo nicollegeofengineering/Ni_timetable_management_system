@@ -1,17 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
+import { connectDB } from "../config/db.js"; // <-- added import
 const router = express.Router();
 
 import Subject_db from "../models/Subjects.model.js";
-
-// In-memory cache
-let subject_cache = null;
-
-// Helper function to clear cache
-const clearCache = () => {
-  subject_cache = null;
-  console.log("Subject cache cleared");
-};
 
 /**
  * GET /api/subject/all
@@ -23,14 +15,14 @@ const clearCache = () => {
  */
 router.get("/all", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Build filter
     const filter = {};
 
-    // Search by subjectName or subjectCode (case-insensitive, partial match)
     if (req.query.search && req.query.search.trim()) {
       const searchTerm = req.query.search.trim();
       filter.$or = [
@@ -39,12 +31,10 @@ router.get("/all", async (req, res) => {
       ];
     }
 
-    // Category filter
     if (req.query.category && req.query.category.trim()) {
       filter.Category = { $regex: req.query.category.trim(), $options: "i" };
     }
 
-    // Execute queries in parallel
     const [subjects, total] = await Promise.all([
       Subject_db.find(filter)
         .sort({ createdAt: -1 })
@@ -75,7 +65,6 @@ router.get("/all", async (req, res) => {
   }
 });
 
-
 /**
  * POST /api/subject/
  * Create a new subject
@@ -83,9 +72,10 @@ router.get("/all", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { subjectName, subjectCode, Category } = req.body;
 
-    // Validate required fields
     if (!subjectName || !subjectName.trim()) {
       return res.status(400).json({
         success: false,
@@ -105,16 +95,14 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Format values
     const formattedSubjectName = subjectName.trim().toUpperCase();
     const formattedSubjectCode = subjectCode.trim().toUpperCase();
     const formattedCategory = Category.trim().toUpperCase();
 
-    // Check if subject code already exists
-    const existingSubject = await Subject_db.findOne({ 
-      subjectCode: formattedSubjectCode 
+    const existingSubject = await Subject_db.findOne({
+      subjectCode: formattedSubjectCode
     });
-    
+
     if (existingSubject) {
       return res.status(409).json({
         success: false,
@@ -124,8 +112,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    
-
     const newSubject = new Subject_db({
       subjectName: formattedSubjectName,
       subjectCode: formattedSubjectCode,
@@ -133,9 +119,6 @@ router.post("/", async (req, res) => {
     });
 
     await newSubject.save();
-    
-    // Clear cache after adding new subject
-    clearCache();
 
     res.status(201).json({
       success: true,
@@ -144,8 +127,7 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating subject:", err);
-    
-    // Handle mongoose duplicate key error
+
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
       const value = err.keyValue[field];
@@ -171,10 +153,11 @@ router.post("/", async (req, res) => {
  */
 router.put("/:id", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { id } = req.params;
     const { subjectName, Category } = req.body;
 
-    // Validate ID
     if (!id) {
       return res.status(400).json({
         success: false,
@@ -182,7 +165,6 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -190,7 +172,6 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Find existing subject
     const existingSubject = await Subject_db.findById(id);
     if (!existingSubject) {
       return res.status(404).json({
@@ -199,7 +180,6 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Build update object
     const updateData = {};
 
     if (subjectName && subjectName.trim()) {
@@ -207,12 +187,9 @@ router.put("/:id", async (req, res) => {
     }
 
     if (Category && Category.trim()) {
-      const formattedCategory = Category.trim().toUpperCase();
-        updateData.Category = formattedCategory;
-      }
-    
+      updateData.Category = Category.trim().toUpperCase();
+    }
 
-    // If no fields to update
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
@@ -233,9 +210,6 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Clear cache after updating subject
-    clearCache();
-
     res.status(200).json({
       success: true,
       message: "Subject updated successfully",
@@ -244,7 +218,6 @@ router.put("/:id", async (req, res) => {
   } catch (err) {
     console.error("Error updating subject:", err);
 
-    // Handle mongoose duplicate key error
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
       const value = err.keyValue[field];
@@ -263,16 +236,16 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-
 /**
  * DELETE /api/subject/:id
  * Delete a subject by ID
  */
 router.delete("/:id", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { id } = req.params;
 
-    // Validate ID
     if (!id) {
       return res.status(400).json({
         success: false,
@@ -280,7 +253,6 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -297,9 +269,6 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Clear cache after deleting subject
-    clearCache();
-
     res.status(200).json({
       success: true,
       message: "Subject deleted successfully",
@@ -313,7 +282,5 @@ router.delete("/:id", async (req, res) => {
     });
   }
 });
-
-
 
 export default router;

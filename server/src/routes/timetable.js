@@ -1,4 +1,5 @@
 import express from "express";
+import { connectDB } from "../config/db.js"; // <-- added import
 const router = express.Router();
 
 import Timetable from "../models/Timetable.model.js";
@@ -28,6 +29,8 @@ const fetchTimetableWithPopulate = async (filter) => {
 // ---------- GET /api/timetable/all ----------
 router.get("/all", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { academicYear, department, year } = req.query;
 
     if (!academicYear) {
@@ -83,6 +86,8 @@ router.get("/all", async (req, res) => {
 // ---------- PUT /api/timetable/upsert ----------
 router.put("/upsert", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const {
       academicYear,
       department,
@@ -250,12 +255,13 @@ router.put("/upsert", async (req, res) => {
   }
 });
 
-// ---------- DELETE /api/timetable/:id ----------
 // ---------- DELETE /api/timetable/clear ----------
 // Clear all timetable entries for a given academic year
 // Query params: academicYear (required), department (optional), year (optional)
 router.delete("/clear", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { academicYear, department, year } = req.query;
 
     if (!academicYear) {
@@ -289,6 +295,8 @@ router.delete("/clear", async (req, res) => {
 // ---------- GET /api/timetable/subject-reference ----------
 router.get("/subject-reference", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { academicYear, department, year } = req.query;
     if (!academicYear || !department || !year) {
       return res.status(400).json({

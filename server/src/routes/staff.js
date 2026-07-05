@@ -1,5 +1,6 @@
 import express from "express";
 const router = express.Router();
+import { connectDB } from "../config/db.js"; // <-- added import
 
 import Staff_db from "../models/Staff.model.js";
 import Department_db from "../models/Department.model.js";
@@ -14,24 +15,22 @@ import Department_db from "../models/Department.model.js";
  */
 router.get("/all", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Build filter
     const filter = {};
 
-    // Department filter
     if (req.query.department) {
       filter.department = req.query.department;
     }
 
-    // Search by staffName (partial, case-insensitive)
     if (req.query.search && req.query.search.trim()) {
       filter.staffName = { $regex: req.query.search.trim(), $options: "i" };
     }
 
-    // Execute queries in parallel
     const [staff, total] = await Promise.all([
       Staff_db.find(filter)
         .populate("department", "name code")
@@ -69,6 +68,8 @@ router.get("/all", async (req, res) => {
  */
 router.get("/:id", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { id } = req.params;
     const staff = await Staff_db.findById(id).populate("department", "name code");
     if (!staff) {
@@ -97,9 +98,10 @@ router.get("/:id", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { staffName, staffCode, staffId, facultyId, department } = req.body;
 
-    // Validate required fields
     if (!staffName || !staffCode || !staffId || !facultyId || !department) {
       return res.status(400).json({
         success: false,
@@ -107,7 +109,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Check if department exists
     const deptExists = await Department_db.findById(department);
     if (!deptExists) {
       return res.status(404).json({
@@ -116,7 +117,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Check uniqueness for staffCode, staffId, facultyId
     const existing = await Staff_db.findOne({
       $or: [{ staffCode }, { staffId }, { facultyId }],
     });
@@ -165,10 +165,11 @@ router.post("/", async (req, res) => {
  */
 router.put("/:id", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { id } = req.params;
     const { staffName, staffId, facultyId, department } = req.body;
 
-    // Find existing staff
     const existingStaff = await Staff_db.findById(id);
     if (!existingStaff) {
       return res.status(404).json({
@@ -177,12 +178,10 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Build update object (only allowed fields)
     const updateData = {};
 
     if (staffName) updateData.staffName = staffName;
     if (staffId && staffId !== existingStaff.staffId) {
-      // Check uniqueness of staffId
       const duplicate = await Staff_db.findOne({ staffId });
       if (duplicate) {
         return res.status(409).json({
@@ -215,7 +214,6 @@ router.put("/:id", async (req, res) => {
       updateData.department = department;
     }
 
-    // If no fields to update, return early
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
@@ -249,6 +247,8 @@ router.put("/:id", async (req, res) => {
  */
 router.delete("/:id", async (req, res) => {
   try {
+    await connectDB(); // <-- added
+
     const { id } = req.params;
     const deletedStaff = await Staff_db.findByIdAndDelete(id);
 
