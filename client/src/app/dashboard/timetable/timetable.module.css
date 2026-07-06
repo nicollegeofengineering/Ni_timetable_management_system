@@ -103,6 +103,7 @@
     font-size: 14px;
     font-family: "Segoe UI", system-ui, sans-serif;
     font-weight: bold;
+    background: white;
 }
 .container input[type="date"]::-webkit-calendar-picker-indicator {
   display: none;
