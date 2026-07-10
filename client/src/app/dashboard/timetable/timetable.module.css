@@ -293,7 +293,7 @@
 }
 
 .mtDisabledText {
-  font-size: 12px;
+  font-size: 14px;
   color: #999;
   font-style: italic;
 }
@@ -387,6 +387,11 @@
     font-weight: bold;
     font-size: 15px;
 
+}
+.deleteIcon,
+.rowClearIcon {
+  /* These classes only serve as selectors for the PDF export logic.
+     No additional styling is needed, but they must exist in the module. */
 }
 
 /* ================= PRINT STYLES (NEW) ================= */

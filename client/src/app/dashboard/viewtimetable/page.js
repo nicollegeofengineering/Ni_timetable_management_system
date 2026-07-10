@@ -320,6 +320,7 @@ export default function ViewTimetablePage() {
                   <p>YEAR/SEM:{" "}{yearLabel} / {semesterType === "ODD" ? (yearLabel*2-1) : (yearLabel*2)}</p>
                   <div className={styles.wef}>
                     <p>w.e.f:</p>
+                    {" "}
                     <input type="date" value={wef} onChange={(e) => setWef(e.target.value)} />
                   </div>
                 </div>

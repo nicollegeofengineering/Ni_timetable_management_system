@@ -19,7 +19,7 @@ export default function TimetablePage() {
   const [semesterType, setSemesterType] = useState("ODD");
   const [wef, setWef] = useState("");
   const [loading, setLoading] = useState(true);
-  const [clearing, setClearing] = useState(false);
+  const [deletingKey, setDeletingKey] = useState(null); // tracks which cell/row/class delete is in flight
 
   // Master data
   const [departments, setDepartments] = useState([]);
@@ -60,6 +60,8 @@ export default function TimetablePage() {
     { label: "Break", period: null, type: "break" },
     { label: "P7", period: 7, type: "period" },
   ];
+
+  const semesterNum = semesterType === "ODD" ? 1 : 2;
 
   // ---------- POPUP POSITION HELPER ----------
   const getAdjustedPosition = (rect, popupWidth = 220, popupHeight = 250) => {
@@ -198,7 +200,7 @@ export default function TimetablePage() {
       academicYear,
       department: branch.departmentCode,
       year: branch.year,
-      semester: semesterType === "ODD" ? 1 : 2,
+      semester: semesterNum,
       day: dayNum,
       period: periodNum,
       subject: subject?._id || null,
@@ -261,6 +263,122 @@ export default function TimetablePage() {
     }
 
     saveEntry(entryKey, dayNum, branch, periodNum, subject, staff);
+  };
+
+  // ---------- DELETE HANDLERS ----------
+
+  // Clear ONE period cell for ONE class (backend: DELETE /timetable/cell)
+  const handleDeleteCell = async (dayNum, branch, periodNum, entryKey) => {
+    const confirmDelete = window.confirm(
+      `Clear this slot (${branch.label}, ${days[dayNum - 1]}, Period ${periodNum})?`
+    );
+    if (!confirmDelete) return;
+
+    setDeletingKey(entryKey);
+    try {
+      await api.delete("/timetable/cell", {
+        params: {
+          academicYear,
+          department: branch.departmentCode,
+          year: branch.year,
+          semester: semesterNum,
+          day: dayNum,
+          period: periodNum,
+        },
+      });
+      setEntries((prev) => {
+        const next = { ...prev };
+        delete next[entryKey];
+        return next;
+      });
+    } catch (err) {
+      alert(`Failed to clear slot: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setDeletingKey(null);
+    }
+  };
+
+  // Clear an ENTIRE day-row (all periods + hall) for ONE class (backend: DELETE /timetable/row)
+  const handleDeleteRow = async (dayNum, branch) => {
+    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
+    const confirmDelete = window.confirm(
+      `Clear the WHOLE ${days[dayNum - 1]} row for ${branch.label}?\n\nThis removes every period and the hall booking for that day.`
+    );
+    if (!confirmDelete) return;
+
+    setDeletingKey(rowKey);
+    try {
+      await api.delete("/timetable/row", {
+        params: {
+          academicYear,
+          department: branch.departmentCode,
+          year: branch.year,
+          semester: semesterNum,
+          day: dayNum,
+        },
+      });
+      setEntries((prev) => {
+        const next = { ...prev };
+        periodColumns.forEach((col) => {
+          if (col.type !== "period") return;
+          const key = `${branch.departmentCode}__${branch.year}__${dayNum}__${col.period}`;
+          delete next[key];
+        });
+        return next;
+      });
+      setHallByRow((prev) => {
+        const next = { ...prev };
+        delete next[rowKey];
+        return next;
+      });
+    } catch (err) {
+      alert(`Failed to clear row: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setDeletingKey(null);
+    }
+  };
+
+  // Clear the ENTIRE timetable (all days/periods) for ONE class (backend: DELETE /timetable/class)
+  const handleDeleteClass = async (branch) => {
+    const classKey = `${branch.departmentCode}__${branch.year}`;
+    const confirmDelete = window.confirm(
+      `⚠️ Delete the FULL timetable for ${branch.label} (${semesterType} sem, ${academicYear})?\n\nThis clears every day and period for this class only. This cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    setDeletingKey(classKey);
+    try {
+      await api.delete("/timetable/class", {
+        params: {
+          academicYear,
+          department: branch.departmentCode,
+          year: branch.year,
+          semester: semesterNum,
+        },
+      });
+      setEntries((prev) => {
+        const next = {};
+        Object.entries(prev).forEach(([key, val]) => {
+          if (!key.startsWith(`${branch.departmentCode}__${branch.year}__`)) {
+            next[key] = val;
+          }
+        });
+        return next;
+      });
+      setHallByRow((prev) => {
+        const next = {};
+        Object.entries(prev).forEach(([key, val]) => {
+          if (!key.startsWith(`${branch.departmentCode}__${branch.year}__`)) {
+            next[key] = val;
+          }
+        });
+        return next;
+      });
+    } catch (err) {
+      alert(`Failed to delete class timetable: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setDeletingKey(null);
+    }
   };
 
   // ---------- POPUP HANDLERS ----------
@@ -350,7 +468,7 @@ export default function TimetablePage() {
     );
   };
 
-  const filterStaff = (query, dayNum, periodNum, currentKey) => {
+  const filterStaff = (query, dayNum, periodNum, currentKey, currentSubjectId) => {
     const assignedStaffIds = new Set();
     Object.entries(entries).forEach(([key, val]) => {
       if (key === currentKey) return;
@@ -358,7 +476,14 @@ export default function TimetablePage() {
       const keyDay = parseInt(parts[2]);
       const keyPeriod = parseInt(parts[3]);
       if (keyDay === dayNum && keyPeriod === periodNum && val.staff) {
-        assignedStaffIds.add(val.staff._id);
+        // Same staff at the same time is fine if it's the SAME subject —
+        // that's a common class shared across departments. Only block
+        // when it's a genuine double-booking on a different subject.
+        const sameSubject =
+          currentSubjectId && val.subject && val.subject._id === currentSubjectId;
+        if (!sameSubject) {
+          assignedStaffIds.add(val.staff._id);
+        }
       }
     });
 
@@ -414,38 +539,6 @@ export default function TimetablePage() {
     return Array.from(map.values());
   }, [entries]);
 
-  // ---------- CLEAR TIMETABLE HANDLER ----------
-  const handleClearTimetable = async () => {
-    if (!academicYear) {
-      alert("Please select an Academic Year first.");
-      return;
-    }
-
-    const confirmClear = window.confirm(
-      `⚠️ Are you sure you want to CLEAR ALL timetable entries for Academic Year ${academicYear}?\n\nThis action cannot be undone.`
-    );
-
-    if (!confirmClear) return;
-
-    setClearing(true);
-    try {
-      await api.delete("/timetable/clear", {
-        params: { academicYear },
-      });
-
-      // Clear local state
-      setEntries({});
-      setHallByRow({});
-
-      alert(`✅ All timetable entries for ${academicYear} have been cleared.`);
-    } catch (err) {
-      console.error("Clear error:", err);
-      alert(`❌ Failed to clear: ${err.response?.data?.message || err.message}`);
-    } finally {
-      setClearing(false);
-    }
-  };
-
   // ---------- PDF EXPORT HANDLER ----------
   const handleDownloadPdf = async () => {
     const element = pdfContainerRef.current;
@@ -477,6 +570,13 @@ export default function TimetablePage() {
       el.style.maxHeight = "none";
       el.style.width = "max-content";
     });
+
+    // --- HIDE DELETE & ROW-CLEAR ICONS FOR PDF ---
+    const deleteIcons = element.querySelectorAll(`.${styles.deleteIcon}`);
+    const rowClearIcons = element.querySelectorAll(`.${styles.rowClearIcon}`);
+
+    deleteIcons.forEach((icon) => { icon.style.display = "none"; });
+    rowClearIcons.forEach((icon) => { icon.style.display = "none"; });
 
     try {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -529,12 +629,16 @@ export default function TimetablePage() {
       console.error("PDF generation error:", error);
       alert("Failed to generate PDF. Please try again.");
     } finally {
+      // Restore scrollable elements
       originalStyles.forEach(({ el, overflow, height, maxHeight, width }) => {
         el.style.overflow = overflow;
         el.style.height = height;
         el.style.maxHeight = maxHeight;
         el.style.width = width;
       });
+      // Restore the icons
+      deleteIcons.forEach((icon) => { icon.style.display = ""; });
+      rowClearIcons.forEach((icon) => { icon.style.display = ""; });
     }
   };
 
@@ -577,13 +681,6 @@ export default function TimetablePage() {
 
         <button onClick={handleDownloadPdf} className={styles.pbutton}>
           EXPORT PDF
-        </button>
-        <button
-          onClick={handleClearTimetable}
-          className={styles.abutton}
-          disabled={clearing}
-        >
-          {clearing ? "Clearing..." : "CLEAR"}
         </button>
       </div>
 
@@ -658,6 +755,7 @@ export default function TimetablePage() {
                     const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
                     const rowHall = hallByRow[rowKey] || null;
                     const hasHall = !!rowHall;
+                    const classKey = `${branch.departmentCode}__${branch.year}`;
 
                     return (
                       <tr key={`${day}-${branch.label}`}>
@@ -666,7 +764,26 @@ export default function TimetablePage() {
                             {day}
                           </td>
                         )}
-                        <td className={styles.mtBranchCell}>{branch.label}</td>
+                        <td className={styles.mtBranchCell}>
+                          {branch.label}
+                          {" "}
+                          <span
+                          className={styles.deleteIcon} 
+                            title={`Delete full timetable for ${branch.label}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClass(branch);
+                            }}
+                            style={{
+                              cursor: "pointer",
+                              color: "#f44336",
+                              fontSize: "9px",
+                              opacity: deletingKey === classKey ? 0.4 : 1,
+                            }}
+                          >
+                            🗑
+                          </span>
+                        </td>
 
                         {periodColumns.map((col, idx) => {
                           if (col.type !== "period") {
@@ -713,7 +830,7 @@ export default function TimetablePage() {
                                         openPopup(e, "subject", dayNum, branch, col.period, entryKey);
                                       }}
                                     >
-                                      {entry.subject ? getSubjectCode(entry.subject) : "-"}
+                                      {entry.subject ? getSubjectCode(entry.subject) : "+"}
                                     </span>
                                     <span
                                       className={styles.mtStaffCode}
@@ -726,7 +843,7 @@ export default function TimetablePage() {
                                         openPopup(e, "staff", dayNum, branch, col.period, entryKey);
                                       }}
                                     >
-                                      {entry.staff ? getStaffCode(entry.staff) : "-"}
+                                      {entry.staff ? getStaffCode(entry.staff) : "+"}
                                     </span>
                                     {entry.status === "success" && (
                                       <span className={styles.mtSuccessTick}>✓ Saved</span>
@@ -748,6 +865,10 @@ export default function TimetablePage() {
                           >
                             {rowHall ? (getHallCode(rowHall) || getHallName(rowHall) || "------") : "------"}
                           </span>
+                          {hasHall && (
+                            
+                           <></>
+                          )}
                         </td>
                       </tr>
                     );
@@ -832,12 +953,18 @@ export default function TimetablePage() {
                 ))}
 
               {popup.type === "staff" &&
-                filterStaff(popup.search, popup.dayNum, popup.periodNum, popup.entryKey).map((s) => (
-                  <div key={s._id} className={styles.mtPopupItem} onClick={() => handleSelectStaff(s)}>
-                    <span className={styles.mtPopupItemCode}>{getStaffCode(s)}</span>
-                    <span className={styles.mtPopupItemName}>{getStaffName(s)}</span>
-                  </div>
-                ))}
+  filterStaff(
+    popup.search,
+    popup.dayNum,
+    popup.periodNum,
+    popup.entryKey,
+    entries[popup.entryKey]?.subject?._id
+  ).map((s) => (
+    <div key={s._id} className={styles.mtPopupItem} onClick={() => handleSelectStaff(s)}>
+      <span className={styles.mtPopupItemCode}>{getStaffCode(s)}</span>
+      <span className={styles.mtPopupItemName}>{getStaffName(s)}</span>
+    </div>
+  ))}
 
               {popup.type === "hall" &&
                 filterHalls(popup.search, popup.dayNum, popup.entryKey).map((h) => (
@@ -851,14 +978,36 @@ export default function TimetablePage() {
                 <div className={styles.mtPopupEmpty}>No subjects found</div>
               )}
               {popup.type === "staff" &&
-                filterStaff(popup.search, popup.dayNum, popup.periodNum, popup.entryKey).length === 0 && (
-                  <div className={styles.mtPopupEmpty}>No available staff</div>
-                )}
+  filterStaff(
+    popup.search,
+    popup.dayNum,
+    popup.periodNum,
+    popup.entryKey,
+    entries[popup.entryKey]?.subject?._id
+  ).length === 0 && (
+    <div className={styles.mtPopupEmpty}>No available staff</div>
+  )}
               {popup.type === "hall" &&
                 filterHalls(popup.search, popup.dayNum, popup.entryKey).length === 0 && (
                   <div className={styles.mtPopupEmpty}>No available halls</div>
                 )}
             </div>
+
+            {/* Delete-this-slot option — only for subject/staff popups on a filled cell */}
+            {(popup.type === "subject" || popup.type === "staff") &&
+              (entries[popup.entryKey]?.subject || entries[popup.entryKey]?.staff) && (
+                <div
+                  className={styles.mtPopupItem}
+                  style={{ justifyContent: "center", color: "#f44336", fontWeight: "bold" }}
+                  onClick={() => {
+                    const { dayNum, branch, periodNum, entryKey } = popup;
+                    closePopup();
+                    handleDeleteCell(dayNum, branch, periodNum, entryKey);
+                  }}
+                >
+                  ✕ Clear this slot
+                </div>
+              )}
           </div>
         </div>
       )}

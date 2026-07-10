@@ -1,21 +1,11 @@
 import express from "express";
-import { connectDB } from "../config/db.js"; // <-- added import
+import { connectDB } from "../config/db.js";
 const router = express.Router();
 
 import Timetable from "../models/Timetable.model.js";
 import Subject from "../models/Subjects.model.js";
 import Staff from "../models/Staff.model.js";
 import Hall from "../models/Hall.model.js";
-
-// ---------- In‑memory cache ----------
-let timetableCache = null;
-let cacheAcademicYear = null;
-
-const clearCache = () => {
-  timetableCache = null;
-  cacheAcademicYear = null;
-  console.log("Timetable cache cleared");
-};
 
 // Helper to fetch with population
 const fetchTimetableWithPopulate = async (filter) => {
@@ -29,7 +19,7 @@ const fetchTimetableWithPopulate = async (filter) => {
 // ---------- GET /api/timetable/all ----------
 router.get("/all", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
     const { academicYear, department, year } = req.query;
 
@@ -40,39 +30,15 @@ router.get("/all", async (req, res) => {
       });
     }
 
-    // Build filter
     const filter = { academicYear };
     if (department) filter.department = department.toUpperCase();
     if (year) filter.year = parseInt(year);
 
-    // Check cache
-    if (timetableCache && cacheAcademicYear === academicYear) {
-      // Filter cached data if needed
-      let data = timetableCache;
-      if (department) {
-        data = data.filter((item) => item.department === department.toUpperCase());
-      }
-      if (year) {
-        data = data.filter((item) => item.year === parseInt(year));
-      }
-      return res.status(200).json({
-        success: true,
-        data,
-        cached: true,
-      });
-    }
-
-    // Fetch from DB with population
     const data = await fetchTimetableWithPopulate(filter);
-
-    // Update cache
-    timetableCache = data;
-    cacheAcademicYear = academicYear;
 
     res.status(200).json({
       success: true,
       data,
-      cached: false,
     });
   } catch (err) {
     console.error("Error fetching timetable:", err);
@@ -86,7 +52,7 @@ router.get("/all", async (req, res) => {
 // ---------- PUT /api/timetable/upsert ----------
 router.put("/upsert", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
     const {
       academicYear,
@@ -100,7 +66,6 @@ router.put("/upsert", async (req, res) => {
       hall,
     } = req.body;
 
-    // Validate required fields
     if (!academicYear || !department || !year || !semester || !day || !period) {
       return res.status(400).json({
         success: false,
@@ -114,7 +79,6 @@ router.put("/upsert", async (req, res) => {
     const dayNum = parseInt(day);
     const periodNum = parseInt(period);
 
-    // Validate semester/day/period ranges
     if (![1, 2].includes(semesterNum)) {
       return res.status(400).json({ success: false, message: "semester must be 1 or 2" });
     }
@@ -125,7 +89,6 @@ router.put("/upsert", async (req, res) => {
       return res.status(400).json({ success: false, message: "period must be 1-7" });
     }
 
-    // Optional: check if subject/staff/hall exist (if provided)
     if (subject) {
       const subExists = await Subject.findById(subject);
       if (!subExists) {
@@ -145,7 +108,6 @@ router.put("/upsert", async (req, res) => {
       }
     }
 
-    // Build filter for existing document (to check conflicts)
     const filter = {
       academicYear,
       department: deptUpper,
@@ -155,21 +117,27 @@ router.put("/upsert", async (req, res) => {
       period: periodNum,
     };
 
-    // Find existing entry for this cell (if any)
     const existing = await Timetable.findOne(filter);
 
     // ---------- Conflict Validation ----------
-    // 1. Staff conflict (if staff is provided)
+
+    // 1. Staff conflict — but SKIP if the conflicting slot has the same subject.
+    // Same subject + same staff at the same slot = common class shared across
+    // departments (e.g. two branches taught together), not a real conflict.
     if (staff) {
-      const staffConflict = await Timetable.findOne({
+      const staffConflictQuery = {
         academicYear,
         staff,
         day: dayNum,
         period: periodNum,
-        _id: { $ne: existing?._id }, // exclude current entry
-      });
+        _id: { $ne: existing?._id },
+      };
+      if (subject) {
+        staffConflictQuery.subject = { $ne: subject };
+      }
+
+      const staffConflict = await Timetable.findOne(staffConflictQuery);
       if (staffConflict) {
-        // Fetch staff name for message
         const staffDoc = await Staff.findById(staff);
         const staffName = staffDoc ? staffDoc.staffName : staff;
         return res.status(409).json({
@@ -180,7 +148,7 @@ router.put("/upsert", async (req, res) => {
       }
     }
 
-    // 2. Hall conflict (if hall is provided)
+    // 2. Hall conflict (unchanged)
     if (hall) {
       const hallConflict = await Timetable.findOne({
         academicYear,
@@ -200,7 +168,7 @@ router.put("/upsert", async (req, res) => {
       }
     }
 
-    // 3. Class conflict: same department/year already has another subject in this slot
+    // 3. Class conflict (unchanged)
     if (subject) {
       const classConflict = await Timetable.findOne({
         academicYear,
@@ -238,9 +206,6 @@ router.put("/upsert", async (req, res) => {
       .populate("staff", "staffName staffCode staffId facultyId")
       .populate("hall", "hallName capacity");
 
-    // Clear cache
-    clearCache();
-
     res.status(200).json({
       success: true,
       data: updated,
@@ -255,39 +220,115 @@ router.put("/upsert", async (req, res) => {
   }
 });
 
-// ---------- DELETE /api/timetable/clear ----------
-// Clear all timetable entries for a given academic year
-// Query params: academicYear (required), department (optional), year (optional)
-router.delete("/clear", async (req, res) => {
+// ---------- DELETE /api/timetable/cell ----------
+// Deletes ONE period cell for ONE class. Fully scoped, no accidental wipes.
+router.delete("/cell", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
-    const { academicYear, department, year } = req.query;
+    const { academicYear, department, year, semester, day, period } = req.query;
 
-    if (!academicYear) {
+    if (!academicYear || !department || !year || !semester || !day || !period) {
       return res.status(400).json({
         success: false,
-        message: "academicYear is required",
+        message: "academicYear, department, year, semester, day, and period are all required",
       });
     }
 
-    // Build filter
-    const filter = { academicYear };
-    if (department) filter.department = department.toUpperCase();
-    if (year) filter.year = parseInt(year);
+    const filter = {
+      academicYear,
+      department: department.toUpperCase(),
+      year: parseInt(year),
+      semester: parseInt(semester),
+      day: parseInt(day),
+      period: parseInt(period),
+    };
 
-    const result = await Timetable.deleteMany(filter);
+    const result = await Timetable.deleteOne(filter);
 
-    // Clear cache
-    clearCache();
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "No entry found for that cell" });
+    }
 
     res.status(200).json({
       success: true,
-      message: `Deleted ${result.deletedCount} timetable entries`,
+      message: "Cell cleared",
       deletedCount: result.deletedCount,
     });
   } catch (err) {
-    console.error("Error clearing timetable:", err);
+    console.error("Error deleting cell:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ---------- DELETE /api/timetable/row ----------
+// Deletes every period in ONE day for ONE class (a whole row).
+router.delete("/row", async (req, res) => {
+  try {
+    await connectDB();
+
+    const { academicYear, department, year, semester, day } = req.query;
+
+    if (!academicYear || !department || !year || !semester || !day) {
+      return res.status(400).json({
+        success: false,
+        message: "academicYear, department, year, semester, and day are all required",
+      });
+    }
+
+    const filter = {
+      academicYear,
+      department: department.toUpperCase(),
+      year: parseInt(year),
+      semester: parseInt(semester),
+      day: parseInt(day),
+    };
+
+    const result = await Timetable.deleteMany(filter);
+
+    res.status(200).json({
+      success: true,
+      message: `Deleted ${result.deletedCount} entries for that day`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    console.error("Error deleting row:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ---------- DELETE /api/timetable/class ----------
+// Deletes the FULL timetable for ONE class (dept + year + semester).
+// Deliberately requires every field — no wildcard "delete all for academicYear".
+router.delete("/class", async (req, res) => {
+  try {
+    await connectDB();
+
+    const { academicYear, department, year, semester } = req.query;
+
+    if (!academicYear || !department || !year || !semester) {
+      return res.status(400).json({
+        success: false,
+        message: "academicYear, department, year, and semester are all required",
+      });
+    }
+
+    const filter = {
+      academicYear,
+      department: department.toUpperCase(),
+      year: parseInt(year),
+      semester: parseInt(semester),
+    };
+
+    const result = await Timetable.deleteMany(filter);
+
+    res.status(200).json({
+      success: true,
+      message: `Deleted ${result.deletedCount} entries for this class`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    console.error("Error deleting class timetable:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -295,7 +336,7 @@ router.delete("/clear", async (req, res) => {
 // ---------- GET /api/timetable/subject-reference ----------
 router.get("/subject-reference", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
     const { academicYear, department, year } = req.query;
     if (!academicYear || !department || !year) {
@@ -308,7 +349,6 @@ router.get("/subject-reference", async (req, res) => {
     const deptUpper = department.toUpperCase();
     const yearNum = parseInt(year);
 
-    // Find all entries for that class
     const entries = await Timetable.find({
       academicYear,
       department: deptUpper,
@@ -318,7 +358,6 @@ router.get("/subject-reference", async (req, res) => {
       .populate("staff", "staffName staffCode staffId facultyId")
       .lean();
 
-    // Build unique pairs of (subject, staff)
     const pairMap = new Map();
     entries.forEach((entry) => {
       if (!entry.subject || !entry.staff) return;

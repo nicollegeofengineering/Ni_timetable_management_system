@@ -12,10 +12,10 @@
   flex-direction: column;
 }
 .container{
-  background-color: white;
+  background-color: rgb(255, 255, 255);
   width: 210mm;
   height:297mm;
-  margin-top: 20px;
+  margin-top: 10px;
   margin-bottom: 20px;
   overflow: auto;
 }
@@ -34,7 +34,7 @@
     display: flex;
     justify-content: space-evenly;
     align-items: center;
-    padding: 0px 40px;
+    padding: 0px 30px;
     font-weight: bold;
 
 }
@@ -88,7 +88,7 @@
 }
 .wef input{
     border:none;
-    padding-top:3px;
+    padding-top:2px;
     font-size: 14px;
     font-family: "Segoe UI", system-ui, sans-serif;
     font-weight: bold;
@@ -210,9 +210,9 @@
 .timetableCard {
 
   border-radius: 4px;
-padding-top: 55px;
+padding-top: 30px;
   margin-bottom: 24px;
-   background: white;
+   background: rgb(255, 255, 255);
   page-break-after: always;
   break-after: page;
   height:297mm;
@@ -263,7 +263,7 @@ padding-top: 55px;
 .timetableTable th,
 .timetableTable td {
   border: 1px solid #000;
-  padding: 10px 10px;
+  padding: 7px 5px;
   text-align: center;
 }
 
@@ -306,7 +306,7 @@ padding-top: 55px;
 /* ===== REFERENCE TABLE ===== */
 
 .referenceWrapper {
-  margin-top: 60px;
+  margin-top: 30px;
   padding-top: 8px;
 }
 
@@ -326,7 +326,7 @@ padding-top: 55px;
 .refTable th,
 .refTable td {
   border: 1px solid #000;
-  padding: 10px 4px;
+  padding: 8px 5px;
   text-align: center
 }
 .refTable th{
