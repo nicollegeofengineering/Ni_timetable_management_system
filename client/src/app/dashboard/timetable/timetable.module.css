@@ -388,6 +388,10 @@
     font-size: 15px;
 
 }
+.srTable td.leftAlign {
+  text-align: left;
+  padding-left: 10px;
+}
 .deleteIcon,
 .rowClearIcon {
   /* These classes only serve as selectors for the PDF export logic.

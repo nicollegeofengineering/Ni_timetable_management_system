@@ -34,7 +34,7 @@
     display: flex;
     justify-content: space-evenly;
     align-items: center;
-    padding: 0px 30px;
+    padding: 0px 20px;
     font-weight: bold;
 
 }
@@ -306,7 +306,7 @@ padding-top: 30px;
 /* ===== REFERENCE TABLE ===== */
 
 .referenceWrapper {
-  margin-top: 30px;
+  margin-top: 20px;
   padding-top: 8px;
 }
 
@@ -326,7 +326,7 @@ padding-top: 30px;
 .refTable th,
 .refTable td {
   border: 1px solid #000;
-  padding: 8px 5px;
+  padding: 6px 5px;
   text-align: center
 }
 .refTable th{
@@ -343,7 +343,7 @@ text-align: center;
 .cardFooter {
   display: flex;
   justify-content: space-between;
-  margin-top: 80px;
+  margin-top: 48px;
   margin-left: 80px;
   margin-right: 80px;
   padding-top: 8px;
@@ -352,19 +352,27 @@ text-align: center;
 }
 
 .breakColumn {
-  /* Force vertical text layout from top to bottom */
-  writing-mode: vertical-lr;          /* or vertical-rl, both work */
-  text-orientation: upright;         /* keeps characters upright */
-  /* Remove the transform – it can cause confusion */
-  text-align: center;
-  vertical-align: middle;
-  font-weight: bold;
-  width: 14px;                       /* slightly wider to show text */
-  min-width: 14px;
+  width: 30px;
   background: #fff;
-  font-size: 9px;                    /* match your table font size */
-  letter-spacing: 1px;               /* optional – improves readability */
-  padding: 4px 2px;
+  border: 1px solid #000;
+  position: relative;          /* important */
+  padding: 0;                  /* remove padding so absolute centering works cleanly */
+}
+
+.breakColumn span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-weight: bold;
+  font-size: 9px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.refTable td.leftAlign {
+  text-align: left;
 }
 
 

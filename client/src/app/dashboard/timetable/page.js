@@ -903,9 +903,9 @@ export default function TimetablePage() {
                 referenceRows.map((row, idx) => (
                   <tr key={idx}>
                     <td>{row.subjectCode}</td>
-                    <td>{row.subjectName}</td>
+                    <td className={styles.leftAlign}>{row.subjectName}</td>
                     <td>{row.category}</td>
-                    <td>{row.staffName}</td>
+                    <td className={styles.leftAlign}>{row.staffName}</td>
                     <td>{row.staffCode}</td>
                     <td>{row.facultyId}</td>
                   </tr>

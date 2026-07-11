@@ -31,18 +31,18 @@ export default function ViewTimetablePage() {
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const dayMap = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5 };
 
-  // ---------- NEW COLUMN DEFINITIONS (BREAKS AS VERTICAL SPAN) ----------
+  // ---------- COLUMN DEFINITIONS (BREAKS AS VERTICAL SPAN) ----------
   const columnDefs = [
-    { type: "period", label: "P1", period: 1 },
-    { type: "period", label: "P2", period: 2 },
-    { type: "break", label: "Break I" },
-    { type: "period", label: "P3", period: 3 },
-    { type: "period", label: "P4", period: 4 },
+    { type: "period", label: "I", period: 1 },
+    { type: "period", label: "II", period: 2 },
+    { type: "break", label: "Break 1" },
+    { type: "period", label: "III", period: 3 },
+    { type: "period", label: "IV", period: 4 },
     { type: "break", label: "Lunch Break" },
-    { type: "period", label: "P5", period: 5 },
-    { type: "period", label: "P6", period: 6 },
-    { type: "break", label: "Break II" },
-    { type: "period", label: "P7", period: 7 },
+    { type: "period", label: "V", period: 5 },
+    { type: "period", label: "VI", period: 6 },
+    { type: "break", label: "Break 2" },
+    { type: "period", label: "VII", period: 7 },
   ];
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function ViewTimetablePage() {
       }));
   }, [timetableData]);
 
-  // ---------- BUILD ROWS FOR A GIVEN YEAR (NOW USES columnDefs) ----------
+  // ---------- BUILD ROWS FOR A GIVEN YEAR (USES columnDefs) ----------
   const buildTimetableRows = (entries) => {
     const entryMap = {};
     entries.forEach((entry) => {
@@ -311,52 +311,44 @@ export default function ViewTimetablePage() {
                   <span>{")-("}</span>
                   <p>{semesterType}</p>
                   <span>{")"}</span>
-
                 </div>
                 
                 <div className={styles.headbottom}>
-                  <p>Dep:{" "}{selectedDept}</p>
-                  <p>Hall No:{" "}{hall || "—"}</p>
-                  <p>YEAR/SEM:{" "}{yearLabel} / {semesterType === "ODD" ? (yearLabel*2-1) : (yearLabel*2)}</p>
+                  <p>Dept.:{" "}{selectedDept}</p>
+                  <p>Hall No.:{" "}{hall || "—"}</p>
+                  <p>YEAR/SEM.:{" "}{yearLabel} / {semesterType === "ODD" ? (yearLabel*2-1) : (yearLabel*2)}</p>
                   <div className={styles.wef}>
-                    <p>w.e.f:</p>
+                    <p>w.e.f.:</p>
                     {" "}
                     <input type="date" value={wef} onChange={(e) => setWef(e.target.value)} />
                   </div>
                 </div>
 
-                {/* Timetable Table */}
+                {/* Timetable Table (MODIFIED) */}
                 <table className={styles.timetableTable}>
-                  <thead>
-                    <tr>
-                      <th>Day</th>
-                      {columnDefs.map((col, idx) => (
-                        <th key={idx}>{col.label}</th>
-                      ))}
-                    </tr>
-                  </thead>
                   <tbody>
-                    {rows.map((row, rowIndex) => (
+                    <tr>
+                      <th className={styles.dayHeaderCell}>Day / Period</th>
+                      {columnDefs.map((col, idx) => {
+                        if (col.type === "break") {
+                          return (
+                            <td
+                              key={idx}
+                              rowSpan={days.length + 1}
+                              className={styles.breakColumn}
+                            >
+                              <span>{col.label}</span>
+                            </td>
+                          );
+                        }
+                        return <th key={idx}>{col.label}</th>;
+                      })}
+                    </tr>
+                    {rows.map((row) => (
                       <tr key={row.day}>
                         <td className={styles.dayCell}>{row.day}</td>
                         {row.periods.map((p, colIdx) => {
-                          if (p.type === "break") {
-                            // Render vertical spanning cell ONLY for the first row (Monday)
-                            if (rowIndex === 0) {
-                              return (
-                                <td
-                                  key={colIdx}
-                                  rowSpan={days.length}
-                                  className={styles.breakColumn}
-                                >
-                                  <span>{p.label}</span>
-                                </td>
-                              );
-                            }
-                            // For other rows, do not render anything (already spanned)
-                            return null;
-                          }
-                          // Regular period cell
+                          if (p.type === "break") return null; // handled by rowSpan
                           return (
                             <td key={colIdx} className={styles.periodCell}>
                               <div className={styles.cellContent}>
@@ -371,7 +363,7 @@ export default function ViewTimetablePage() {
                   </tbody>
                 </table>
 
-                {/* Subject Reference Table */}
+                {/* Subject Reference Table (left-align Subject Name & Staff Name) */}
                 {refData.length > 0 && (
                   <div className={styles.referenceWrapper}>
                     <table className={styles.refTable}>
@@ -389,9 +381,9 @@ export default function ViewTimetablePage() {
                         {refData.map((item, idx) => (
                           <tr key={idx}>
                             <td>{item.subjectCode}</td>
-                            <td>{item.subjectName}</td>
+                            <td className={styles.leftAlign}>{item.subjectName}</td>
                             <td>{item.category}</td>
-                            <td>{item.staffName}</td>
+                            <td className={styles.leftAlign}>{item.staffName}</td>
                             <td>{item.staffCode}</td>
                             <td>{item.facultyId}</td>
                           </tr>
