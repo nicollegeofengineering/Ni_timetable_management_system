@@ -10,7 +10,7 @@ import {
   DoorOpen,
   CalendarRange,
   CalendarClock,
-  Settings,
+  ClipboardCheck,
   LogOut,
 } from "lucide-react";
 import api from "@/lib/api";
@@ -24,6 +24,8 @@ const NAV_ITEMS = [
   { label: "Halls", href: "/dashboard/halls", icon: DoorOpen },
   { label: "Master Timetable", href: "/dashboard/timetable", icon: CalendarClock },
   { label: "View Timetable", href: "/dashboard/viewtimetable", icon: CalendarRange },
+  { label: "Staff Timetable", href: "/dashboard/stafftimetable", icon: ClipboardCheck },
+
 ];
 
 export default function AdminSidebar() {

@@ -382,4 +382,59 @@ router.get("/subject-reference", async (req, res) => {
   }
 });
 
+// ---------- GET /api/timetable/staff-view ----------
+router.get("/staffview", async (req, res) => {
+  try {
+    await connectDB();
+
+    const { academicYear,staffId, search } = req.query;
+
+    if (!academicYear) {
+      return res.status(400).json({
+        success: false,
+        message: "academicYear and semester are required",
+      });
+    }
+
+
+    // Base filter
+    const filter = {
+      academicYear,
+    };
+
+    // If staffId is given, fetch only that staff
+    if (staffId) {
+      filter.staff = staffId;
+    }
+
+    const entries = await Timetable.find(filter)
+      .populate("subject", "subjectName subjectCode Category")
+      .populate("staff", "staffName staffCode staffId facultyId")
+      .populate("hall", "hallName")
+      .lean();
+
+    // If a search query is provided, filter staff after population
+    if (search) {
+      const q = search.toUpperCase();
+      const filtered = entries.filter(entry => {
+        if (!entry.staff) return false;
+        return (
+          entry.staff.staffName?.toUpperCase().includes(q) ||
+          entry.staff.staffCode?.toUpperCase().includes(q)
+        );
+      });
+      return res.status(200).json({ success: true, data: filtered });
+    }
+
+    // Otherwise return all entries (grouping will be done on frontend)
+    res.status(200).json({
+      success: true,
+      data: entries,
+    });
+  } catch (err) {
+    console.error("Error fetching staff view:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 export default router;
