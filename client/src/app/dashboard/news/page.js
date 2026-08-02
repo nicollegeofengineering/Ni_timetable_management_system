@@ -2,18 +2,16 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import api from "@/lib/api";
-import styles from "./halls.module.css";
+import styles from "./news.module.css";
 
-export default function HallsPage() {
+export default function NewsPage() {
   useEffect(() => {
     const token = sessionStorage.getItem("token");
-    if (!token) {
-      window.location.href = "/login";
-    }
+    if (!token) window.location.href = "/login";
   }, []);
 
   // ---------- State ----------
-  const [halls, setHalls] = useState([]);
+  const [newsItems, setNewsItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -34,17 +32,19 @@ export default function HallsPage() {
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("add");
+  const [modalMode, setModalMode] = useState("add"); // 'add' or 'edit'
   const [formData, setFormData] = useState({
-    hallName: "",
-    hallCode: "",
-    capacity: "",
+    title: "",
+    content: "",
+    author: "",
+    status: "published",
+    date: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // ---------- Fetch halls ----------
-  const fetchHalls = useCallback(async () => {
+  // ---------- Fetch News ----------
+  const fetchNews = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -54,8 +54,8 @@ export default function HallsPage() {
       };
       if (search.trim()) params.search = search.trim();
 
-      const res = await api.get("/hall/all", { params });
-      setHalls(res.data.data || []);
+      const res = await api.get("/news/admin", { params });
+      setNewsItems(res.data.data || []);
       setPagination((prev) => ({
         ...prev,
         total: res.data.pagination.total,
@@ -64,7 +64,7 @@ export default function HallsPage() {
         hasPrev: res.data.pagination.hasPrev,
       }));
     } catch (err) {
-      setError("Failed to load halls. Please refresh.");
+      setError("Failed to load news. Please refresh.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -72,8 +72,8 @@ export default function HallsPage() {
   }, [pagination.page, pagination.limit, search]);
 
   useEffect(() => {
-    fetchHalls();
-  }, [fetchHalls]);
+    fetchNews();
+  }, [fetchNews]);
 
   // Debounced search
   const handleSearchChange = (e) => {
@@ -102,18 +102,20 @@ export default function HallsPage() {
   // ---------- Modal ----------
   const openAddModal = () => {
     setModalMode("add");
-    setFormData({ hallName: "", hallCode: "", capacity: "" });
+    setFormData({ title: "", content: "", author: "", status: "published", date: "" });
     setFormError("");
     setModalOpen(true);
   };
 
-  const openEditModal = (hall) => {
+  const openEditModal = (item) => {
     setModalMode("edit");
     setFormData({
-      hallName: hall.hallName?.toUpperCase().trim() || "",
-      hallCode: hall.hallCode?.toUpperCase().trim() || "",
-      capacity: hall.capacity.toString(),
-      _id: hall._id,
+      title: item.title,
+      content: item.content || "",
+      author: item.author || "",
+      status: item.status,
+      date: item.date ? item.date.split("T")[0] : "",
+      _id: item._id,
     });
     setFormError("");
     setModalOpen(true);
@@ -121,60 +123,42 @@ export default function HallsPage() {
 
   const closeModal = () => {
     setModalOpen(false);
-    setFormData({ hallName: "", hallCode: "", capacity: "" });
+    setFormData({ title: "", content: "", author: "", status: "published", date: "" });
     setFormError("");
   };
 
-  // ---------- Fixed handleFormChange ----------
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    if (name === "capacity") {
-      // Allow only digits
-      const numValue = value.replace(/[^0-9]/g, "");
-      setFormData((prev) => ({ ...prev, [name]: numValue }));
-    } else {
-      // Uppercase for text fields
-      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase().trim() }));
-    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
 
-    const { hallName, hallCode, capacity } = formData;
-    if (!hallName.trim()) {
-      setFormError("Hall name is required.");
-      return;
-    }
-    if (!hallCode.trim()) {
-      setFormError("Hall code is required.");
-      return;
-    }
-    const capNum = parseInt(capacity);
-    if (!capacity || isNaN(capNum) || capNum <= 0) {
-      setFormError("Capacity must be a positive number.");
+    const { title, content, author, status, date } = formData;
+    if (!title.trim()) {
+      setFormError("Title is required.");
       return;
     }
 
     setSubmitting(true);
     try {
+      const payload = {
+        title: title.trim(),
+        content: content.trim(),
+        author: author.trim() || "Admin",
+        status,
+        date: date || undefined,
+      };
+
       if (modalMode === "add") {
-        await api.post("/hall/", {
-          hallName: hallName.trim(),
-          hallCode: hallCode.trim(),
-          capacity: capNum,
-        });
+        await api.post("/news/", payload);
       } else {
-        await api.put(`/hall/${formData._id}`, {
-          hallName: hallName.trim(),
-          hallCode: hallCode.trim(),
-          capacity: capNum,
-        });
+        await api.put(`/news/${formData._id}`, payload);
       }
       closeModal();
-      await fetchHalls();
+      await fetchNews();
     } catch (err) {
       const msg = err.response?.data?.message || "Operation failed.";
       setFormError(msg);
@@ -183,15 +167,24 @@ export default function HallsPage() {
     }
   };
 
-  // Delete
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Are you sure you want to delete hall "${name}"?`)) return;
+  const handleDelete = async (id, title) => {
+    if (!confirm(`Delete news: "${title}"?`)) return;
     try {
-      await api.delete(`/hall/${id}`);
-      await fetchHalls();
+      await api.delete(`/news/${id}`);
+      await fetchNews();
     } catch (err) {
       alert(`Delete failed: ${err.response?.data?.message || err.message}`);
     }
+  };
+
+  // Format date for display
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   // ---------- Render ----------
@@ -199,9 +192,9 @@ export default function HallsPage() {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Halls</h1>
+        <h1 className={styles.title}>News & Announcements</h1>
         <button className={styles.addButton} onClick={openAddModal}>
-          + Add Hall
+          + Add News
         </button>
       </div>
 
@@ -210,18 +203,13 @@ export default function HallsPage() {
         <div className={styles.searchWrapper}>
           <input
             type="text"
-            placeholder="Search by hall Code..."
+            placeholder="Search by title or content..."
             className={styles.searchInput}
             value={inputValue}
             onChange={handleSearchChange}
           />
           {inputValue && (
-            <button
-              className={styles.clearButton}
-              onClick={clearSearch}
-              type="button"
-              aria-label="Clear search"
-            >
+            <button className={styles.clearButton} onClick={clearSearch} type="button">
               ✕
             </button>
           )}
@@ -231,7 +219,7 @@ export default function HallsPage() {
       {error && <div className={styles.errorBanner}>{error}</div>}
 
       {loading ? (
-        <div className={styles.loading}>Loading halls…</div>
+        <div className={styles.loading}>Loading news…</div>
       ) : (
         <>
           <div className={styles.tableWrapper}>
@@ -239,37 +227,37 @@ export default function HallsPage() {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Hall Code</th>
-                  <th>Hall Name</th>
-                  <th>Capacity</th>
+                  <th>Title</th>
+                  <th>Author</th>
+                  <th>Status</th>
+                  <th>Date</th>
                   <th className={styles.actionsHeader}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {halls.length === 0 ? (
+                {newsItems.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className={styles.emptyMessage}>   
-                      No halls found. Adjust search or add a new hall.
+                    <td colSpan="6" className={styles.emptyMessage}>
+                      No news found. Add a new announcement.
                     </td>
                   </tr>
                 ) : (
-                  halls.map((item, index) => (
+                  newsItems.map((item, index) => (
                     <tr key={item._id}>
                       <td>{(pagination.page - 1) * pagination.limit + index + 1}</td>
-                      <td>{item.hallName}</td>
-                      <td>{item.hallCode}</td>
-                      <td>{item.capacity}</td>
+                      <td className={styles.titleCell}>{item.title}</td>
+                      <td>{item.author || "Admin"}</td>
+                      <td>
+                        <span className={item.status === "published" ? styles.statusPublished : styles.statusDraft}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td>{formatDate(item.date)}</td>
                       <td className={styles.actionsCell}>
-                        <button
-                          className={styles.editButton}
-                          onClick={() => openEditModal(item)}
-                        >
+                        <button className={styles.editButton} onClick={() => openEditModal(item)}>
                           Edit
                         </button>
-                        <button
-                          className={styles.deleteButton}
-                          onClick={() => handleDelete(item._id, item.hallName)}
-                        >
+                        <button className={styles.deleteButton} onClick={() => handleDelete(item._id, item.title)}>
                           Delete
                         </button>
                       </td>
@@ -307,7 +295,7 @@ export default function HallsPage() {
         <div className={styles.modalOverlay} onClick={closeModal}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2>{modalMode === "add" ? "Add Hall" : "Edit Hall"}</h2>
+              <h2>{modalMode === "add" ? "Add News" : "Edit News"}</h2>
               <button className={styles.modalClose} onClick={closeModal}>
                 ×
               </button>
@@ -316,63 +304,76 @@ export default function HallsPage() {
               {formError && <div className={styles.formError}>{formError}</div>}
 
               <div className={styles.formGroup}>
-                <label htmlFor="hallName">Hall Code</label>
+                <label htmlFor="title">Title *</label>
                 <input
                   type="text"
-                  id="hallName"
-                  name="hallName"
-                  value={formData.hallName}
+                  id="title"
+                  name="title"
+                  value={formData.title}
                   onChange={handleFormChange}
-                  placeholder="e.g., Main Auditorium"
+                  placeholder="e.g., College Annual Day"
                   required
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label htmlFor="hallCode">Hall Name</label>
-                <input
-                  type="text"
-                  id="hallCode"
-                  name="hallCode"
-                  value={formData.hallCode}
+                <label htmlFor="content">Content (optional)</label>
+                <textarea
+                  id="content"
+                  name="content"
+                  value={formData.content}
                   onChange={handleFormChange}
-                  placeholder="e.g., MA101"
-                  required
+                  placeholder="Full announcement text..."
+                  rows="3"
+                  className={styles.textarea}
                 />
               </div>
 
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="author">Author</label>
+                  <input
+                    type="text"
+                    id="author"
+                    name="author"
+                    value={formData.author}
+                    onChange={handleFormChange}
+                    placeholder="e.g., Admin"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="status">Status</label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleFormChange}
+                    className={styles.select}
+                  >
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+              </div>
+
               <div className={styles.formGroup}>
-                <label htmlFor="capacity">Capacity</label>
+                <label htmlFor="date">Date (optional)</label>
                 <input
-                  type="text"   
-                  id="capacity"
-                  name="capacity"
-                  value={formData.capacity}
+                  type="date"
+                  id="date"
+                  name="date"
+                  value={formData.date}
                   onChange={handleFormChange}
-                  placeholder="e.g., 200"
-                  required
                 />
-                <small className={styles.helper}>Number of seats (must be positive).</small>
+                <small className={styles.helper}>Leave empty to use current date.</small>
               </div>
 
               <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.cancelButton}
-                  onClick={closeModal}
-                >
+                <button type="button" className={styles.cancelButton} onClick={closeModal}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className={styles.saveButton}
-                  disabled={submitting}
-                >
-                  {submitting
-                    ? "Saving…"
-                    : modalMode === "add"
-                    ? "Add Hall"
-                    : "Update Hall"}
+                <button type="submit" className={styles.saveButton} disabled={submitting}>
+                  {submitting ? "Saving…" : modalMode === "add" ? "Add News" : "Update News"}
                 </button>
               </div>
             </form>

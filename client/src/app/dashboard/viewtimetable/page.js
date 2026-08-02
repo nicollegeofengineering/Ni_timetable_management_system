@@ -9,29 +9,25 @@ import * as XLSX from "xlsx";
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, BorderStyle } from "docx";
 
 export default function ViewTimetablePage() {
-  // ---------- EXISTING STATE (keep as is) ----------
+  // ---------- STATE ----------
   const [academicYear, setAcademicYear] = useState("2026-2027");
   const [semesterType, setSemesterType] = useState("ODD");
   const [wef, setWef] = useState("");
   const pdfContainerRef = useRef(null);
 
-  // ---------- NEW STATE ----------
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState("");
   const [selectedYear, setSelectedYear] = useState("All");
-  const [selectedSemester, setSelectedSemester] = useState("ODD");
   const [timetableData, setTimetableData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ---------- REF for print/pdf containers ----------
   const viewRef = useRef(null);
 
   // ---------- CONSTANTS ----------
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const dayMap = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5 };
 
-  // ---------- COLUMN DEFINITIONS (BREAKS AS VERTICAL SPAN) ----------
   const columnDefs = [
     { type: "period", label: "I", period: 1 },
     { type: "period", label: "II", period: 2 },
@@ -48,7 +44,6 @@ export default function ViewTimetablePage() {
   useEffect(() => {
     const today = new Date();
     setWef(today.toISOString().split("T")[0]);
-
     const currentYear = new Date().getFullYear();
     setAcademicYear(`${currentYear}-${currentYear + 1}`);
   }, []);
@@ -89,14 +84,13 @@ export default function ViewTimetablePage() {
     }
   }, [academicYear, selectedDept, selectedYear]);
 
-  // ---------- AUTO-FETCH ON DEPT/YEAR CHANGE ----------
   useEffect(() => {
     if (selectedDept) {
       fetchTimetable();
     }
   }, [fetchTimetable, selectedDept]);
 
-  // ---------- GROUP TIMETABLE BY YEAR ----------
+  // ---------- GROUP BY YEAR ----------
   const groupedByYear = useMemo(() => {
     const groups = {};
     timetableData.forEach((entry) => {
@@ -112,7 +106,7 @@ export default function ViewTimetablePage() {
       }));
   }, [timetableData]);
 
-  // ---------- BUILD ROWS FOR A GIVEN YEAR (USES columnDefs) ----------
+  // ---------- BUILD ROWS ----------
   const buildTimetableRows = (entries) => {
     const entryMap = {};
     entries.forEach((entry) => {
@@ -124,10 +118,8 @@ export default function ViewTimetablePage() {
       const dayNum = idx + 1;
       const periods = columnDefs.map((col) => {
         if (col.type === "break") {
-          // break cells will be handled by rowSpan in the render
           return { type: "break", label: col.label };
         }
-        // period cell
         const key = `${dayNum}|${col.period}`;
         const entry = entryMap[key];
         if (entry) {
@@ -143,7 +135,7 @@ export default function ViewTimetablePage() {
     });
   };
 
-  // ---------- GENERATE SUBJECT REFERENCE ----------
+  // ---------- SUBJECT REFERENCE ----------
   const generateReference = (entries) => {
     const map = new Map();
     entries.forEach((entry) => {
@@ -164,13 +156,27 @@ export default function ViewTimetablePage() {
     return Array.from(map.values());
   };
 
-  // ---------- FIND HALL FOR A YEAR ----------
-  const getHallForYear = (entries) => {
-    const hallEntry = entries.find((e) => e.hall);
-    return hallEntry?.hall?.hallName || "";
+  // ---------- FIND MOST FREQUENT HALL ----------
+  const getMostFrequentHall = (entries) => {
+    const hallCounts = {};
+    entries.forEach((entry) => {
+      if (entry.hall && entry.hall.hallName) {
+        const name = entry.hall.hallName;
+        hallCounts[name] = (hallCounts[name] || 0) + 1;
+      }
+    });
+    let maxCount = 0;
+    let mostFrequentHall = "";
+    for (const [name, count] of Object.entries(hallCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostFrequentHall = name;
+      }
+    }
+    return mostFrequentHall;
   };
 
-  // ---------- EXPORT PDF (unmodified aside from container) ----------
+  // ---------- EXPORT PDF ----------
   const handleExportPDF = async () => {
     const element = viewRef.current;
     if (!element) return;
@@ -286,7 +292,7 @@ export default function ViewTimetablePage() {
           {loading && <div className={styles.loading}>Loading…</div>}
           {error && <div className={styles.error}>{error}</div>}
 
-          {/* Timetable Containers */}
+          {/* Timetable Cards */}
           {!loading && !error && groupedByYear.length === 0 && (
             <div className={styles.noData}>No timetable data found.</div>
           )}
@@ -294,12 +300,13 @@ export default function ViewTimetablePage() {
           {!loading && !error && groupedByYear.map(({ year, entries }) => {
             const rows = buildTimetableRows(entries);
             const refData = generateReference(entries);
-            const hall = getHallForYear(entries);
-            const yearLabel = [1, 2, 3, 4][year - 1];
+            const hall = getMostFrequentHall(entries);
+            const yearLabel = ["I", "II", "III", "IV"][year - 1];
+            const semesterNum = semesterType === "ODD" ? (year * 2 - 1) : (year * 2);
 
             return (
               <div key={year} className={styles.timetableCard}>
-                {/* Card Header */}
+                {/* Header */}
                 <div className={styles.header}>
                   <img src="/nilogo.png" alt="College Logo" width="700" height="104.3" />
                 </div>
@@ -312,19 +319,18 @@ export default function ViewTimetablePage() {
                   <p>{semesterType}</p>
                   <span>{")"}</span>
                 </div>
-                
+
                 <div className={styles.headbottom}>
-                  <p>Dept.:{" "}{selectedDept}</p>
-                  <p>Hall No.:{" "}{hall || "—"}</p>
-                  <p>YEAR/SEM.:{" "}{yearLabel} / {semesterType === "ODD" ? (yearLabel*2-1) : (yearLabel*2)}</p>
+                  <p>Dept.: {selectedDept}</p>
+                  <p>Hall No.: {hall || "—"}</p>
+                  <p>YEAR/SEM.: {yearLabel} / {semesterNum}</p>
                   <div className={styles.wef}>
                     <p>w.e.f.:</p>
-                    {" "}
                     <input type="date" value={wef} onChange={(e) => setWef(e.target.value)} />
                   </div>
                 </div>
 
-                {/* Timetable Table (MODIFIED) */}
+                {/* Timetable Table */}
                 <table className={styles.timetableTable}>
                   <tbody>
                     <tr>
@@ -348,7 +354,7 @@ export default function ViewTimetablePage() {
                       <tr key={row.day}>
                         <td className={styles.dayCell}>{row.day}</td>
                         {row.periods.map((p, colIdx) => {
-                          if (p.type === "break") return null; // handled by rowSpan
+                          if (p.type === "break") return null;
                           return (
                             <td key={colIdx} className={styles.periodCell}>
                               <div className={styles.cellContent}>
@@ -363,7 +369,7 @@ export default function ViewTimetablePage() {
                   </tbody>
                 </table>
 
-                {/* Subject Reference Table (left-align Subject Name & Staff Name) */}
+                {/* Subject Reference */}
                 {refData.length > 0 && (
                   <div className={styles.referenceWrapper}>
                     <table className={styles.refTable}>
@@ -399,7 +405,7 @@ export default function ViewTimetablePage() {
                   <span>PRINCIPAL</span>
                 </div>
                 <div className={styles.creditLine}>
-                Generated via NI‑Timetable Management System | © {new Date().getFullYear()} Department of Artificial Intelligence and Data Science, Noorul Islam College of Engineering and Technology. All Rights Reserved.
+                  Generated via NI‑Timetable Management System | © {new Date().getFullYear()} Department of Artificial Intelligence and Data Science, Noorul Islam College of Engineering and Technology. All Rights Reserved.
                 </div>
               </div>
             );

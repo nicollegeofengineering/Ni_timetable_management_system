@@ -12,9 +12,11 @@ import {
   CalendarClock,
   ClipboardCheck,
   LogOut,
+  DoorClosed,
 } from "lucide-react";
 import api from "@/lib/api";
 import styles from "./AdminSidebar.module.css";
+import { href } from "react-router-dom";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -25,6 +27,9 @@ const NAV_ITEMS = [
   { label: "Master Timetable", href: "/dashboard/timetable", icon: CalendarClock },
   { label: "View Timetable", href: "/dashboard/viewtimetable", icon: CalendarRange },
   { label: "Staff Timetable", href: "/dashboard/stafftimetable", icon: ClipboardCheck },
+  {label:"Hall Timetable",href:"/dashboard/halltimetable",icon:DoorClosed},
+  {label:"News",href:"/dashboard/news",icon:ClipboardCheck},
+  {label:"Admissions",href:"/dashboard/admissions",icon:ClipboardCheck},
 
 ];
 

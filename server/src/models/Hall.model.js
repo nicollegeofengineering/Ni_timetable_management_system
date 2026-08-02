@@ -6,14 +6,19 @@ const hallSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      trim: true,
     },
-
+    hallCode: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      uppercase: true,
+    },
     capacity: {
       type: Number,
       required: true,
     },
-
-   
   },
   {
     timestamps: true,

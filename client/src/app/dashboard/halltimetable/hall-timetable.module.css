@@ -1,0 +1,331 @@
+.pageWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f5f5f5;
+  min-height: 100vh;
+  padding: 20px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  align-items: center;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.filterSelect {
+  padding: 4px 8px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+}
+
+.searchContainer {
+  position: relative;
+}
+
+.searchInput {
+  padding: 4px 8px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 200px;
+}
+
+.clearbtn {
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.clearbtn:hover {
+  background-color: #ff6666;
+}
+
+.clearbtn:active {
+  background-color: #cc0000;
+  transform: scale(0.96);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ccc;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dropdown li {
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dropdown li:hover {
+  background: #f0f4ff;
+}
+
+.pdfButton {
+  background-color: #3db13b;
+  color: white;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.pdfButton:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
+}
+
+.pdfButton:hover:not(:disabled) {
+  background-color: #2e8b2e;
+}
+
+.container {
+  background: white;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 15px 20px 30px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden; /* prevent content from spilling out */
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.header img {
+  max-width: 100%;
+  height: auto;
+}
+
+.titleRow {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 5px;
+  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.titleRow h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.wefRow {
+  text-align: right;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.wefRow input {
+  border: none;
+  font-weight: bold;
+  background: transparent;
+}
+
+.hallInfo {
+  display: flex;
+  margin-bottom: 12px;
+  font-size: 12px;
+  justify-content: space-evenly;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto; /* allow horizontal scroll if needed, but we want to fit A4 */
+}
+
+.hallTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px; /* reduce font size to fit */
+  table-layout: fixed; /* force columns to respect width */
+}
+
+.hallTable th,
+.hallTable td {
+  border: 1px solid black;
+  text-align: center;
+  padding: 6px 4px; /* reduce padding */
+  vertical-align: middle;
+  word-break: break-word; /* prevent long words from overflowing */
+}
+
+.dayHead {
+  width: 50px;
+}
+
+.dayCell {
+  font-weight: bold;
+}
+
+.breakColumn {
+  background-color: #eee;
+  width: 16px;
+}
+
+.periodCell {
+  min-width: 30px;
+  height: auto;
+}
+
+.periodContent {
+  display: flex;
+  flex-direction: column;
+  font-size: 9px;
+}
+
+.slotItem {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px dashed #ccc;
+  padding: 1px 0;
+}
+
+.slotItem:last-child {
+  border-bottom: none;
+}
+
+.classInfo {
+  font-weight: bold;
+  font-size: 8px;
+}
+
+.subjectCode {
+  color: #444;
+  font-size: 8px;
+}
+
+.staffCode {
+  font-size: 7px;
+  color: #666;
+}
+
+.emptyCell {
+  color: #bbb;
+}
+
+.emptyMsg {
+  padding: 20px;
+  color: #888;
+  font-style: italic;
+}
+
+.srWrapper {
+  margin-top: 15px;
+  padding: 0 15px 15px;
+}
+
+.srTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8px;
+}
+
+.srTable th,
+.srTable td {
+  border: 1px solid black;
+  text-align: center;
+  padding: 7px 5px;
+  font-size: 8px;
+}
+
+.srTable thead th {
+  font-weight: bold;
+}
+
+.srTable td.leftAlign {
+  text-align: left;
+  padding-left: 8px;
+}
+
+.footer {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  padding: 0 10px;
+}
+
+.creditLine {
+  font-size: 7px;
+  color: #aaa;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 5mm;
+  }
+  .controls, .searchContainer, .dropdown {
+    display: none !important;
+  }
+  .pageWrapper {
+    background: white;
+    padding: 0;
+  }
+  .container {
+    box-shadow: none;
+    margin: 0;
+    width: 100%;
+    height: auto;
+    padding: 5mm 5mm 10mm;
+  }
+  .hallTable {
+    font-size: 7px;
+  }
+  .hallTable th,
+  .hallTable td {
+    padding: 3px 2px;
+  }
+  .header img {
+    max-height: 60px;
+  }
+  .titleRow {
+    font-size: 14px;
+  }
+  .titleRow h3 {
+    font-size: 14px;
+  }
+  .srTable {
+    font-size: 6px;
+  }
+  .creditLine {
+    font-size: 6px;
+  }
+}

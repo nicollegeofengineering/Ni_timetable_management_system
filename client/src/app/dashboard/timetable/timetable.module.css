@@ -397,6 +397,18 @@
   /* These classes only serve as selectors for the PDF export logic.
      No additional styling is needed, but they must exist in the module. */
 }
+.mtHallCode {
+  cursor: pointer;
+  padding: 0 0px;
+}
+.mtHallWarning {
+  font-size: 8px;
+  color: #f44336;
+}
+.mtSuccessTick {
+  font-size: 10px;
+  color: #4caf50;
+}
 
 /* ================= PRINT STYLES (NEW) ================= */
 

@@ -437,4 +437,55 @@ router.get("/staffview", async (req, res) => {
   }
 });
 
+// ---------- GET /api/timetable/hallview ----------
+router.get("/hallview", async (req, res) => {
+  try {
+    await connectDB();
+
+    const { academicYear, hallId, search } = req.query;
+
+    if (!academicYear) {
+      return res.status(400).json({
+        success: false,
+        message: "academicYear is required",
+      });
+    }
+
+    const filter = { academicYear };
+
+    if (hallId) {
+      filter.hall = hallId;
+    }
+
+    let entries = await Timetable.find(filter)
+      .populate("subject", "subjectName subjectCode Category")
+      .populate("staff", "staffName staffCode staffId facultyId")
+      .populate("hall", "hallName hallCode")
+      .lean();
+
+    // If search query is provided, filter by hall name/code after population
+    if (search) {
+      const q = search.toUpperCase();
+      entries = entries.filter(entry => {
+        if (!entry.hall) return false;
+        return (
+          entry.hall.hallName?.toUpperCase().includes(q) ||
+          entry.hall.hallCode?.toUpperCase().includes(q)
+        );
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: entries,
+    });
+  } catch (err) {
+    console.error("Error fetching hall view:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 export default router;

@@ -7,19 +7,12 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
 export default function TimetablePage() {
-
-  useEffect(() => {
-    const token = sessionStorage.getItem("token");
-    if (!token) {
-      window.location.href = "/login";
-    }
-  },[])
   // ---------- STATE ----------
   const [academicYear, setAcademicYear] = useState("2026-2027");
   const [semesterType, setSemesterType] = useState("ODD");
   const [wef, setWef] = useState("");
   const [loading, setLoading] = useState(true);
-  const [deletingKey, setDeletingKey] = useState(null); // tracks which cell/row/class delete is in flight
+  const [deletingKey, setDeletingKey] = useState(null);
 
   // Master data
   const [departments, setDepartments] = useState([]);
@@ -29,13 +22,10 @@ export default function TimetablePage() {
 
   // Timetable entries
   const [entries, setEntries] = useState({});
-  const [hallByRow, setHallByRow] = useState({});
 
   // Popup state
   const [popup, setPopup] = useState(null);
   const popupInputRef = useRef(null);
-
-  // ---------- REF for PDF export ----------
   const pdfContainerRef = useRef(null);
 
   // ---------- CONSTANTS ----------
@@ -63,26 +53,6 @@ export default function TimetablePage() {
 
   const semesterNum = semesterType === "ODD" ? 1 : 2;
 
-  // ---------- POPUP POSITION HELPER ----------
-  const getAdjustedPosition = (rect, popupWidth = 220, popupHeight = 250) => {
-    let x = rect.left;
-    let y = rect.bottom + window.scrollY + 2;
-
-    // Right edge overflow
-    if (x + popupWidth > window.innerWidth) {
-      x = window.innerWidth - popupWidth - 5;
-    }
-    if (x < 0) x = 5;
-
-    // Bottom edge overflow
-    if (y + popupHeight > window.innerHeight + window.scrollY) {
-      y = rect.top + window.scrollY - popupHeight - 2;
-    }
-    if (y < 0) y = 5;
-
-    return { x, y };
-  };
-
   // ---------- HELPERS ----------
   const getSubjectCode = (s) => s?.subjectCode || "";
   const getSubjectName = (s) => s?.subjectName || "";
@@ -92,6 +62,11 @@ export default function TimetablePage() {
   const getFacultyId = (s) => s?.facultyId || "";
   const getHallCode = (h) => h?.hallCode || h?.hallName || "";
   const getHallName = (h) => h?.hallName || "";
+
+  const isLabSubject = (subject) => {
+    const cat = getSubjectCategory(subject).toUpperCase();
+    return cat === "LAB" || cat === "PRACTICAL";
+  };
 
   // ---------- AUTO SET ACADEMIC YEAR ----------
   useEffect(() => {
@@ -149,7 +124,6 @@ export default function TimetablePage() {
         const data = res.data.data || [];
 
         const newEntries = {};
-        const newHallByRow = {};
         data.forEach((item) => {
           const deptCode = item.department;
           const yearVal = item.year;
@@ -162,20 +136,13 @@ export default function TimetablePage() {
           newEntries[key] = {
             subject: item.subject || null,
             staff: item.staff || null,
+            hall: item.hall || null,
             status: "idle",
             errorMsg: null,
           };
-
-          if (item.hall) {
-            const rowKey = `${deptCode}__${yearVal}__${dayNum}`;
-            if (!newHallByRow[rowKey]) {
-              newHallByRow[rowKey] = item.hall;
-            }
-          }
         });
 
         setEntries(newEntries);
-        setHallByRow(newHallByRow);
       } catch (err) {
         console.error("Failed to load timetable:", err);
       } finally {
@@ -187,15 +154,7 @@ export default function TimetablePage() {
   }, [academicYear, branches]);
 
   // ---------- SAVE ENTRY ----------
-  const saveEntry = async (entryKey, dayNum, branch, periodNum, subject, staff) => {
-    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
-    const hall = hallByRow[rowKey] || null;
-
-    if (!hall) {
-      alert("Please select a Hall for this row first.");
-      return;
-    }
-
+  const saveEntry = async (entryKey, dayNum, branch, periodNum, subject, staff, hall) => {
     const payload = {
       academicYear,
       department: branch.departmentCode,
@@ -205,7 +164,7 @@ export default function TimetablePage() {
       period: periodNum,
       subject: subject?._id || null,
       staff: staff?._id || null,
-      hall: hall._id || null,
+      hall: hall?._id || null,
     };
 
     setEntries((prev) => ({
@@ -220,6 +179,7 @@ export default function TimetablePage() {
         [entryKey]: {
           subject,
           staff,
+          hall,
           status: "success",
           errorMsg: null,
         },
@@ -243,31 +203,31 @@ export default function TimetablePage() {
   };
 
   // ---------- HANDLE CELL UPDATE ----------
-  const attemptUpdate = (entryKey, dayNum, branch, periodNum, newSubject, newStaff) => {
+  const attemptUpdate = (entryKey, dayNum, branch, periodNum, newSubject, newStaff, newHall) => {
     const prev = entries[entryKey] || {};
-    const subject = newSubject || prev.subject || null;
-    const staff = newStaff || prev.staff || null;
+    const subject = newSubject !== undefined ? newSubject : prev.subject;
+    const staff = newStaff !== undefined ? newStaff : prev.staff;
+    const hall = newHall !== undefined ? newHall : prev.hall;
 
-    if (!subject || !staff) {
-      setEntries((prev) => ({
-        ...prev,
-        [entryKey]: { ...prev[entryKey], subject, staff, status: "idle", errorMsg: null },
-      }));
+    // For lab subjects, hall is mandatory
+    if (subject && isLabSubject(subject) && !hall) {
+      alert("Please select a computer hall for this lab period.");
       return;
     }
 
-    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
-    if (!hallByRow[rowKey]) {
-      alert("Please select a Hall for this row first.");
-      return;
-    }
+    // For non-lab, hall is optional (can be null)
+    setEntries((prev) => ({
+      ...prev,
+      [entryKey]: { ...prev[entryKey], subject, staff, hall, status: "idle", errorMsg: null },
+    }));
 
-    saveEntry(entryKey, dayNum, branch, periodNum, subject, staff);
+    // Save if we have subject and staff
+    if (subject && staff) {
+      saveEntry(entryKey, dayNum, branch, periodNum, subject, staff, hall);
+    }
   };
 
   // ---------- DELETE HANDLERS ----------
-
-  // Clear ONE period cell for ONE class (backend: DELETE /timetable/cell)
   const handleDeleteCell = async (dayNum, branch, periodNum, entryKey) => {
     const confirmDelete = window.confirm(
       `Clear this slot (${branch.label}, ${days[dayNum - 1]}, Period ${periodNum})?`
@@ -298,14 +258,13 @@ export default function TimetablePage() {
     }
   };
 
-  // Clear an ENTIRE day-row (all periods + hall) for ONE class (backend: DELETE /timetable/row)
   const handleDeleteRow = async (dayNum, branch) => {
-    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
     const confirmDelete = window.confirm(
-      `Clear the WHOLE ${days[dayNum - 1]} row for ${branch.label}?\n\nThis removes every period and the hall booking for that day.`
+      `Clear the WHOLE ${days[dayNum - 1]} row for ${branch.label}?`
     );
     if (!confirmDelete) return;
 
+    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
     setDeletingKey(rowKey);
     try {
       await api.delete("/timetable/row", {
@@ -326,11 +285,6 @@ export default function TimetablePage() {
         });
         return next;
       });
-      setHallByRow((prev) => {
-        const next = { ...prev };
-        delete next[rowKey];
-        return next;
-      });
     } catch (err) {
       alert(`Failed to clear row: ${err.response?.data?.message || err.message}`);
     } finally {
@@ -338,11 +292,10 @@ export default function TimetablePage() {
     }
   };
 
-  // Clear the ENTIRE timetable (all days/periods) for ONE class (backend: DELETE /timetable/class)
   const handleDeleteClass = async (branch) => {
     const classKey = `${branch.departmentCode}__${branch.year}`;
     const confirmDelete = window.confirm(
-      `⚠️ Delete the FULL timetable for ${branch.label} (${semesterType} sem, ${academicYear})?\n\nThis clears every day and period for this class only. This cannot be undone.`
+      `⚠️ Delete the FULL timetable for ${branch.label} (${semesterType} sem, ${academicYear})?`
     );
     if (!confirmDelete) return;
 
@@ -365,15 +318,6 @@ export default function TimetablePage() {
         });
         return next;
       });
-      setHallByRow((prev) => {
-        const next = {};
-        Object.entries(prev).forEach(([key, val]) => {
-          if (!key.startsWith(`${branch.departmentCode}__${branch.year}__`)) {
-            next[key] = val;
-          }
-        });
-        return next;
-      });
     } catch (err) {
       alert(`Failed to delete class timetable: ${err.response?.data?.message || err.message}`);
     } finally {
@@ -384,13 +328,6 @@ export default function TimetablePage() {
   // ---------- POPUP HANDLERS ----------
   const openPopup = (e, type, dayNum, branch, periodNum, entryKey) => {
     e.stopPropagation();
-
-    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
-    if (!hallByRow[rowKey]) {
-      alert("Please select a Hall for this row first.");
-      return;
-    }
-
     const rect = e.currentTarget.getBoundingClientRect();
     const { x, y } = getAdjustedPosition(rect);
     setPopup({
@@ -406,20 +343,18 @@ export default function TimetablePage() {
     setTimeout(() => popupInputRef.current?.focus(), 50);
   };
 
-  const openHallPopup = (e, dayNum, branch) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const { x, y } = getAdjustedPosition(rect);
-    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
-    setPopup({
-      type: "hall",
-      dayNum,
-      branch,
-      entryKey: rowKey,
-      x,
-      y,
-      search: "",
-    });
+  const getAdjustedPosition = (rect, popupWidth = 220, popupHeight = 250) => {
+    let x = rect.left;
+    let y = rect.bottom + window.scrollY + 2;
+    if (x + popupWidth > window.innerWidth) {
+      x = window.innerWidth - popupWidth - 5;
+    }
+    if (x < 0) x = 5;
+    if (y + popupHeight > window.innerHeight + window.scrollY) {
+      y = rect.top + window.scrollY - popupHeight - 2;
+    }
+    if (y < 0) y = 5;
+    return { x, y };
   };
 
   const closePopup = () => setPopup(null);
@@ -428,7 +363,7 @@ export default function TimetablePage() {
     if (!popup) return;
     const { entryKey, dayNum, branch, periodNum } = popup;
     const prev = entries[entryKey] || {};
-    attemptUpdate(entryKey, dayNum, branch, periodNum, subject, prev.staff);
+    attemptUpdate(entryKey, dayNum, branch, periodNum, subject, prev.staff, prev.hall);
     closePopup();
   };
 
@@ -436,25 +371,16 @@ export default function TimetablePage() {
     if (!popup) return;
     const { entryKey, dayNum, branch, periodNum } = popup;
     const prev = entries[entryKey] || {};
-    attemptUpdate(entryKey, dayNum, branch, periodNum, prev.subject, staff);
+    attemptUpdate(entryKey, dayNum, branch, periodNum, prev.subject, staff, prev.hall);
     closePopup();
   };
 
-  const handleSelectHall = async (hall) => {
+  const handleSelectHall = (hall) => {
     if (!popup) return;
-    const { dayNum, branch, entryKey: rowKey } = popup;
-
-    setHallByRow((prev) => ({ ...prev, [rowKey]: hall }));
+    const { entryKey, dayNum, branch, periodNum } = popup;
+    const prev = entries[entryKey] || {};
+    attemptUpdate(entryKey, dayNum, branch, periodNum, prev.subject, prev.staff, hall);
     closePopup();
-
-    for (const col of periodColumns) {
-      if (col.type !== "period") continue;
-      const periodKey = `${branch.departmentCode}__${branch.year}__${dayNum}__${col.period}`;
-      const entry = entries[periodKey];
-      if (entry?.subject && entry?.staff) {
-        await saveEntry(periodKey, dayNum, branch, col.period, entry.subject, entry.staff);
-      }
-    }
   };
 
   // ---------- FILTER FUNCTIONS ----------
@@ -476,11 +402,7 @@ export default function TimetablePage() {
       const keyDay = parseInt(parts[2]);
       const keyPeriod = parseInt(parts[3]);
       if (keyDay === dayNum && keyPeriod === periodNum && val.staff) {
-        // Same staff at the same time is fine if it's the SAME subject —
-        // that's a common class shared across departments. Only block
-        // when it's a genuine double-booking on a different subject.
-        const sameSubject =
-          currentSubjectId && val.subject && val.subject._id === currentSubjectId;
+        const sameSubject = currentSubjectId && val.subject && val.subject._id === currentSubjectId;
         if (!sameSubject) {
           assignedStaffIds.add(val.staff._id);
         }
@@ -497,14 +419,17 @@ export default function TimetablePage() {
     );
   };
 
-  const filterHalls = (query, dayNum, currentRowKey) => {
+  // ---------- CORRECTED HALL FILTER ----------
+  // Only blocks halls already booked in the same day AND same period (by any class)
+  const filterHalls = (query, dayNum, periodNum, currentKey) => {
     const assignedHallIds = new Set();
-    Object.entries(hallByRow).forEach(([key, hall]) => {
-      if (key === currentRowKey) return;
+    Object.entries(entries).forEach(([key, val]) => {
+      if (key === currentKey) return;
       const parts = key.split("__");
       const keyDay = parseInt(parts[2]);
-      if (keyDay === dayNum && hall) {
-        assignedHallIds.add(hall._id);
+      const keyPeriod = parseInt(parts[3]);
+      if (keyDay === dayNum && keyPeriod === periodNum && val.hall) {
+        assignedHallIds.add(val.hall._id);
       }
     });
 
@@ -539,7 +464,7 @@ export default function TimetablePage() {
     return Array.from(map.values());
   }, [entries]);
 
-  // ---------- PDF EXPORT HANDLER ----------
+  // ---------- PDF EXPORT ----------
   const handleDownloadPdf = async () => {
     const element = pdfContainerRef.current;
     if (!element) {
@@ -571,10 +496,8 @@ export default function TimetablePage() {
       el.style.width = "max-content";
     });
 
-    // --- HIDE DELETE & ROW-CLEAR ICONS FOR PDF ---
     const deleteIcons = element.querySelectorAll(`.${styles.deleteIcon}`);
     const rowClearIcons = element.querySelectorAll(`.${styles.rowClearIcon}`);
-
     deleteIcons.forEach((icon) => { icon.style.display = "none"; });
     rowClearIcons.forEach((icon) => { icon.style.display = "none"; });
 
@@ -629,14 +552,12 @@ export default function TimetablePage() {
       console.error("PDF generation error:", error);
       alert("Failed to generate PDF. Please try again.");
     } finally {
-      // Restore scrollable elements
       originalStyles.forEach(({ el, overflow, height, maxHeight, width }) => {
         el.style.overflow = overflow;
         el.style.height = height;
         el.style.maxHeight = maxHeight;
         el.style.width = width;
       });
-      // Restore the icons
       deleteIcons.forEach((icon) => { icon.style.display = ""; });
       rowClearIcons.forEach((icon) => { icon.style.display = ""; });
     }
@@ -648,36 +569,35 @@ export default function TimetablePage() {
       {/* Action Buttons Bar */}
       <div className={styles.hbutton}>
         <select
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className={styles.filterSelect}
-              >
-                {useMemo(() => {
-                  const currentYear = new Date().getFullYear();
-                  const options = [];
-                  for (let i = -1; i <= 1; i++) {
-                    const start = currentYear + i;
-                    const end = start + 1;
-                    const label = `${start}-${end}`;
-                    options.push(
-                      <option key={label} value={label}>
-                        {label}
-                      </option>
-                    );
-                  }
-                  return options;
-                }, [])}
-              </select>
+          value={academicYear}
+          onChange={(e) => setAcademicYear(e.target.value)}
+          className={styles.filterSelect}
+        >
+          {useMemo(() => {
+            const currentYear = new Date().getFullYear();
+            const options = [];
+            for (let i = -1; i <= 1; i++) {
+              const start = currentYear + i;
+              const end = start + 1;
+              const label = `${start}-${end}`;
+              options.push(
+                <option key={label} value={label}>
+                  {label}
+                </option>
+              );
+            }
+            return options;
+          }, [])}
+        </select>
 
-              <select
-                value={semesterType}
-                onChange={(e) => setSemesterType(e.target.value)}
-                className={styles.filterSelect}
-                 >
-                  <option value="ODD">ODD</option>
-                  <option value="EVEN">EVEN</option>
-               </select>
-
+        <select
+          value={semesterType}
+          onChange={(e) => setSemesterType(e.target.value)}
+          className={styles.filterSelect}
+        >
+          <option value="ODD">ODD</option>
+          <option value="EVEN">EVEN</option>
+        </select>
 
         <button onClick={handleDownloadPdf} className={styles.pbutton}>
           EXPORT PDF
@@ -696,7 +616,7 @@ export default function TimetablePage() {
           <span> {"("}</span>
           <p>{academicYear}</p>
           <span>{")-("}</span>
-          <p >{semesterType}</p>
+          <p>{semesterType}</p>
           <span>{")"}</span>
         </div>
 
@@ -718,29 +638,26 @@ export default function TimetablePage() {
                 {periodColumns.map((col, idx) => (
                   <th key={`${col.label}-${idx}`}>{col.label}</th>
                 ))}
-                <th>Hall No</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={2 + periodColumns.length + 1} className={styles.mtLoadingCell}>
+                  <td colSpan={2 + periodColumns.length} className={styles.mtLoadingCell}>
                     Loading...
                   </td>
                 </tr>
               )}
-
               {!loading && branches.length === 0 && (
                 <tr>
-                  <td colSpan={2 + periodColumns.length + 1} className={styles.mtLoadingCell}>
+                  <td colSpan={2 + periodColumns.length} className={styles.mtLoadingCell}>
                     No departments found.
                   </td>
                 </tr>
               )}
-
               {!loading && branches.length > 0 && academicYear === "" && (
                 <tr>
-                  <td colSpan={2 + periodColumns.length + 1} className={styles.mtLoadingCell}>
+                  <td colSpan={2 + periodColumns.length} className={styles.mtLoadingCell}>
                     Please enter an Academic Year.
                   </td>
                 </tr>
@@ -752,11 +669,7 @@ export default function TimetablePage() {
                 days.map((day) => {
                   const dayNum = dayMap[day];
                   return branches.map((branch, idx) => {
-                    const rowKey = `${branch.departmentCode}__${branch.year}__${dayNum}`;
-                    const rowHall = hallByRow[rowKey] || null;
-                    const hasHall = !!rowHall;
                     const classKey = `${branch.departmentCode}__${branch.year}`;
-
                     return (
                       <tr key={`${day}-${branch.label}`}>
                         {idx === 0 && (
@@ -766,9 +679,8 @@ export default function TimetablePage() {
                         )}
                         <td className={styles.mtBranchCell}>
                           {branch.label}
-                          {" "}
                           <span
-                          className={styles.deleteIcon} 
+                            className={styles.deleteIcon}
                             title={`Delete full timetable for ${branch.label}`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -796,80 +708,67 @@ export default function TimetablePage() {
 
                           const entryKey = `${branch.departmentCode}__${branch.year}__${dayNum}__${col.period}`;
                           const entry = entries[entryKey] || {};
-                          const isDisabled = !hasHall;
+                          const { subject, staff, hall, status, errorMsg } = entry;
+                          const isLab = subject ? isLabSubject(subject) : false;
 
                           return (
                             <td
                               key={`${col.label}-${idx}`}
                               className={`${styles.mtPeriodCell} ${
-                                entry.status === "error" ? styles.mtCellError : ""
-                              } ${isDisabled ? styles.mtPeriodDisabled : ""}`}
-                              onClick={
-                                isDisabled
-                                  ? (e) => {
-                                      e.stopPropagation();
-                                      alert("Please select a Hall for this row first.");
-                                    }
-                                  : (e) =>
-                                      openPopup(e, "subject", dayNum, branch, col.period, entryKey)
-                              }
+                                status === "error" ? styles.mtCellError : ""
+                              }`}
                             >
                               <div className={styles.mtPeriodBox}>
-                                {isDisabled ? (
-                                  <span className={styles.mtDisabledText}>Select Hall</span>
-                                ) : (
-                                  <>
-                                    <span
-                                      className={styles.mtSubjectCode}
-                                      onClick={(e) => {
-                                        if (!hasHall) {
-                                          e.stopPropagation();
-                                          alert("Please select a Hall for this row first.");
-                                          return;
-                                        }
-                                        openPopup(e, "subject", dayNum, branch, col.period, entryKey);
-                                      }}
-                                    >
-                                      {entry.subject ? getSubjectCode(entry.subject) : "+"}
-                                    </span>
-                                    <span
-                                      className={styles.mtStaffCode}
-                                      onClick={(e) => {
-                                        if (!hasHall) {
-                                          e.stopPropagation();
-                                          alert("Please select a Hall for this row first.");
-                                          return;
-                                        }
-                                        openPopup(e, "staff", dayNum, branch, col.period, entryKey);
-                                      }}
-                                    >
-                                      {entry.staff ? getStaffCode(entry.staff) : "+"}
-                                    </span>
-                                    {entry.status === "success" && (
-                                      <span className={styles.mtSuccessTick}>✓ Saved</span>
-                                    )}
-                                    {entry.status === "error" && (
-                                      <span className={styles.mtErrorMsg}>{entry.errorMsg}</span>
-                                    )}
-                                  </>
+                                {/* Subject selector */}
+                                <span
+                                  className={styles.mtSubjectCode}
+                                  onClick={(e) =>
+                                    openPopup(e, "subject", dayNum, branch, col.period, entryKey)
+                                  }
+                                >
+                                  {subject ? getSubjectCode(subject) : "+"}
+                                </span>
+                                {/* Staff selector */}
+                                <span
+                                  className={styles.mtStaffCode}
+                                  onClick={(e) =>
+                                    openPopup(e, "staff", dayNum, branch, col.period, entryKey)
+                                  }
+                                >
+                                  {staff ? getStaffCode(staff) : "+"}
+                                </span>
+                                {/* Hall selector – always visible */}
+                                <span
+                                  className={styles.mtHallCode}
+                                  onClick={(e) => {
+                                    openPopup(e, "hall", dayNum, branch, col.period, entryKey);
+                                  }}
+                                  style={{
+                                    cursor: "pointer",
+                                    fontSize: "10px",
+                                    color: hall ? "#1976d2" : (isLab ? "#f44336" : "#888"),
+                                    fontWeight: "bold",
+                                    marginLeft: "4px",
+                                  }}
+                                  title={isLab && !hall ? "Lab requires a hall" : "Select hall"}
+                                >
+                                  {hall ? getHallName(hall) : "+"}
+                                </span>
+                                {status === "success" && (
+                                  <span className={styles.mtSuccessTick}>✓</span>
+                                )}
+                                {status === "error" && (
+                                  <span className={styles.mtErrorMsg}>{errorMsg}</span>
+                                )}
+                                {isLab && !hall && (
+                                  <span className={styles.mtHallWarning} style={{ color: "#f44336", fontSize: "8px", display: "block" }}>
+                                    ⚠ Hall req.
+                                  </span>
                                 )}
                               </div>
                             </td>
                           );
                         })}
-
-                        <td className={styles.mtHallCell}>
-                          <span
-                            className={styles.mtHallCode}
-                            onClick={(e) => openHallPopup(e, dayNum, branch)}
-                          >
-                            {rowHall ? (getHallCode(rowHall) || getHallName(rowHall) || "------") : "------"}
-                          </span>
-                          {hasHall && (
-                            
-                           <></>
-                          )}
-                        </td>
                       </tr>
                     );
                   });
@@ -880,7 +779,6 @@ export default function TimetablePage() {
 
         {/* ===== SUBJECT REFERENCE ===== */}
         <div className={styles.srWrapper}>
-          
           <table className={styles.srTable}>
             <thead>
               <tr>
@@ -915,6 +813,7 @@ export default function TimetablePage() {
           </table>
         </div>
 
+        {/* Signatures */}
         <div className={styles.sign}>
           <p>HOD</p>
           <p>PRINCIPAL</p>
@@ -953,21 +852,26 @@ export default function TimetablePage() {
                 ))}
 
               {popup.type === "staff" &&
-  filterStaff(
-    popup.search,
-    popup.dayNum,
-    popup.periodNum,
-    popup.entryKey,
-    entries[popup.entryKey]?.subject?._id
-  ).map((s) => (
-    <div key={s._id} className={styles.mtPopupItem} onClick={() => handleSelectStaff(s)}>
-      <span className={styles.mtPopupItemCode}>{getStaffCode(s)}</span>
-      <span className={styles.mtPopupItemName}>{getStaffName(s)}</span>
-    </div>
-  ))}
+                filterStaff(
+                  popup.search,
+                  popup.dayNum,
+                  popup.periodNum,
+                  popup.entryKey,
+                  entries[popup.entryKey]?.subject?._id
+                ).map((s) => (
+                  <div key={s._id} className={styles.mtPopupItem} onClick={() => handleSelectStaff(s)}>
+                    <span className={styles.mtPopupItemCode}>{getStaffCode(s)}</span>
+                    <span className={styles.mtPopupItemName}>{getStaffName(s)}</span>
+                  </div>
+                ))}
 
               {popup.type === "hall" &&
-                filterHalls(popup.search, popup.dayNum, popup.entryKey).map((h) => (
+                filterHalls(
+                  popup.search,
+                  popup.dayNum,
+                  popup.periodNum,
+                  popup.entryKey
+                ).map((h) => (
                   <div key={h._id} className={styles.mtPopupItem} onClick={() => handleSelectHall(h)}>
                     <span className={styles.mtPopupItemCode}>{getHallCode(h)}</span>
                     <span className={styles.mtPopupItemName}>{getHallName(h)}</span>
@@ -978,22 +882,22 @@ export default function TimetablePage() {
                 <div className={styles.mtPopupEmpty}>No subjects found</div>
               )}
               {popup.type === "staff" &&
-  filterStaff(
-    popup.search,
-    popup.dayNum,
-    popup.periodNum,
-    popup.entryKey,
-    entries[popup.entryKey]?.subject?._id
-  ).length === 0 && (
-    <div className={styles.mtPopupEmpty}>No available staff</div>
-  )}
+                filterStaff(
+                  popup.search,
+                  popup.dayNum,
+                  popup.periodNum,
+                  popup.entryKey,
+                  entries[popup.entryKey]?.subject?._id
+                ).length === 0 && (
+                  <div className={styles.mtPopupEmpty}>No available staff</div>
+                )}
               {popup.type === "hall" &&
-                filterHalls(popup.search, popup.dayNum, popup.entryKey).length === 0 && (
+                filterHalls(popup.search, popup.dayNum, popup.periodNum, popup.entryKey).length === 0 && (
                   <div className={styles.mtPopupEmpty}>No available halls</div>
                 )}
             </div>
 
-            {/* Delete-this-slot option — only for subject/staff popups on a filled cell */}
+            {/* Clear slot option */}
             {(popup.type === "subject" || popup.type === "staff") &&
               (entries[popup.entryKey]?.subject || entries[popup.entryKey]?.staff) && (
                 <div

@@ -1,32 +1,31 @@
 import express from "express";
 import mongoose from "mongoose";
-import { connectDB } from "../config/db.js"; // <-- added import
+import { connectDB } from "../config/db.js";
 const router = express.Router();
 
-import Hall_db from "../models/Hall.model.js";
+import Hall from "../models/Hall.model.js";
 
 /**
  * GET /api/hall/all
- * Query params:
- *   page      - number (default 1)
- *   limit     - number (default 10)
- *   search    - string (optional) – search in hallName (case-insensitive)
- *   minCapacity - number (optional) – filter by minimum capacity
- *   maxCapacity - number (optional) – filter by maximum capacity
+ * Query:
+ *   page, limit, search (hallName or hallCode), minCapacity, maxCapacity
  */
 router.get("/all", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Build filter
     const filter = {};
 
     if (req.query.search && req.query.search.trim()) {
-      filter.hallName = { $regex: req.query.search.trim(), $options: "i" };
+      const searchRegex = req.query.search.trim();
+      filter.$or = [
+        { hallName: { $regex: searchRegex, $options: "i" } },
+        { hallCode: { $regex: searchRegex, $options: "i" } },
+      ];
     }
 
     if (req.query.minCapacity) {
@@ -44,12 +43,12 @@ router.get("/all", async (req, res) => {
     }
 
     const [halls, total] = await Promise.all([
-      Hall_db.find(filter)
+      Hall.find(filter)
         .sort({ hallName: 1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Hall_db.countDocuments(filter),
+      Hall.countDocuments(filter),
     ]);
 
     res.status(200).json({
@@ -75,11 +74,11 @@ router.get("/all", async (req, res) => {
 
 /**
  * GET /api/hall/search/:term
- * Search halls by name (returns all matches, no pagination)
+ * Search by hallName or hallCode (no pagination)
  */
 router.get("/search/:term", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
     const { term } = req.params;
 
@@ -91,8 +90,11 @@ router.get("/search/:term", async (req, res) => {
     }
 
     const searchTerm = term.trim();
-    const halls = await Hall_db.find({
-      hallName: { $regex: searchTerm, $options: "i" }
+    const halls = await Hall.find({
+      $or: [
+        { hallName: { $regex: searchTerm, $options: "i" } },
+        { hallCode: { $regex: searchTerm, $options: "i" } },
+      ],
     }).sort({ hallName: 1 });
 
     res.status(200).json({
@@ -111,22 +113,27 @@ router.get("/search/:term", async (req, res) => {
 
 /**
  * POST /api/hall/
- * Create a new hall
- * Required fields: hallName, capacity
+ * Create a new hall (requires hallName, hallCode, capacity)
  */
 router.post("/", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
-    const { hallName, capacity } = req.body;
+    const { hallName, hallCode, capacity } = req.body;
 
+    // Validate required fields
     if (!hallName || !hallName.trim()) {
       return res.status(400).json({
         success: false,
         message: "Hall name is required",
       });
     }
-
+    if (!hallCode || !hallCode.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Hall code is required",
+      });
+    }
     if (capacity === undefined || capacity === null) {
       return res.status(400).json({
         success: false,
@@ -142,23 +149,27 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const formattedHallName = hallName.trim();
+    const formattedName = hallName.trim();
+    const formattedCode = hallCode.trim().toUpperCase();
 
-    const existingHall = await Hall_db.findOne({
-      hallName: formattedHallName
+    // Check for duplicates (both hallName and hallCode must be unique)
+    const existing = await Hall.findOne({
+      $or: [{ hallName: formattedName }, { hallCode: formattedCode }],
     });
 
-    if (existingHall) {
+    if (existing) {
+      const field = existing.hallName === formattedName ? "hallName" : "hallCode";
       return res.status(409).json({
         success: false,
-        message: `Hall '${formattedHallName}' already exists`,
-        field: "hallName",
-        value: formattedHallName,
+        message: `${field} '${existing[field]}' already exists`,
+        field,
+        value: existing[field],
       });
     }
 
-    const newHall = new Hall_db({
-      hallName: formattedHallName,
+    const newHall = new Hall({
+      hallName: formattedName,
+      hallCode: formattedCode,
       capacity: parsedCapacity,
     });
 
@@ -192,15 +203,14 @@ router.post("/", async (req, res) => {
 
 /**
  * PUT /api/hall/:id
- * Update a hall by ID
- * Allowed fields: hallName, capacity
+ * Update a hall (hallName, hallCode, capacity)
  */
 router.put("/:id", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
     const { id } = req.params;
-    const { hallName, capacity } = req.body;
+    const { hallName, hallCode, capacity } = req.body;
 
     if (!id) {
       return res.status(400).json({
@@ -216,7 +226,7 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    const existingHall = await Hall_db.findById(id);
+    const existingHall = await Hall.findById(id);
     if (!existingHall) {
       return res.status(404).json({
         success: false,
@@ -226,26 +236,53 @@ router.put("/:id", async (req, res) => {
 
     const updateData = {};
 
-    if (hallName && hallName.trim()) {
-      const formattedHallName = hallName.trim();
-
-      if (formattedHallName !== existingHall.hallName) {
-        const hallExists = await Hall_db.findOne({
-          hallName: formattedHallName
+    // Validate and prepare hallName
+    if (hallName !== undefined) {
+      if (!hallName.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Hall name cannot be empty",
         });
-
-        if (hallExists) {
+      }
+      const formattedName = hallName.trim();
+      if (formattedName !== existingHall.hallName) {
+        const conflict = await Hall.findOne({ hallName: formattedName });
+        if (conflict) {
           return res.status(409).json({
             success: false,
-            message: `Hall '${formattedHallName}' already exists`,
+            message: `Hall name '${formattedName}' already exists`,
             field: "hallName",
-            value: formattedHallName,
+            value: formattedName,
           });
         }
-        updateData.hallName = formattedHallName;
+        updateData.hallName = formattedName;
       }
     }
 
+    // Validate and prepare hallCode
+    if (hallCode !== undefined) {
+      if (!hallCode.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Hall code cannot be empty",
+        });
+      }
+      const formattedCode = hallCode.trim().toUpperCase();
+      if (formattedCode !== existingHall.hallCode) {
+        const conflict = await Hall.findOne({ hallCode: formattedCode });
+        if (conflict) {
+          return res.status(409).json({
+            success: false,
+            message: `Hall code '${formattedCode}' already exists`,
+            field: "hallCode",
+            value: formattedCode,
+          });
+        }
+        updateData.hallCode = formattedCode;
+      }
+    }
+
+    // Validate and prepare capacity
     if (capacity !== undefined && capacity !== null) {
       const parsedCapacity = parseInt(capacity);
       if (isNaN(parsedCapacity) || parsedCapacity <= 0) {
@@ -254,28 +291,23 @@ router.put("/:id", async (req, res) => {
           message: "Capacity must be a positive number",
         });
       }
-      updateData.capacity = parsedCapacity;
+      if (parsedCapacity !== existingHall.capacity) {
+        updateData.capacity = parsedCapacity;
+      }
     }
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No valid fields to update. Please provide hallName or capacity.",
+        message: "No changes to update",
       });
     }
 
-    const updatedHall = await Hall_db.findByIdAndUpdate(
+    const updatedHall = await Hall.findByIdAndUpdate(
       id,
       updateData,
       { new: true, runValidators: true }
     );
-
-    if (!updatedHall) {
-      return res.status(404).json({
-        success: false,
-        message: "Hall not found after update",
-      });
-    }
 
     res.status(200).json({
       success: true,
@@ -305,11 +337,10 @@ router.put("/:id", async (req, res) => {
 
 /**
  * DELETE /api/hall/:id
- * Delete a hall by ID
  */
 router.delete("/:id", async (req, res) => {
   try {
-    await connectDB(); // <-- added
+    await connectDB();
 
     const { id } = req.params;
 
@@ -327,7 +358,7 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    const deletedHall = await Hall_db.findByIdAndDelete(id);
+    const deletedHall = await Hall.findByIdAndDelete(id);
 
     if (!deletedHall) {
       return res.status(404).json({
