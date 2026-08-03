@@ -131,11 +131,84 @@ export async function sendApplicationReceived(email, name, applicationId) {
   });
 }
 
-// ---------- 3. Application Status Update ----------
-export async function sendApplicationStatusUpdate(email, name, status, comment) {
+// ---------- 3. Application Status Update (Enhanced) ----------
+export async function sendApplicationStatusUpdate(email, name, status, comment, submittedAt) {
   const statusText = status === 'accepted' ? 'ACCEPTED' : 'REJECTED';
   const color = status === 'accepted' ? '#2e7d32' : '#c62828';
-  const statusEmoji = status === 'accepted' ? '🎉' : '📢';
+  const statusEmoji = status === 'accepted' ? '' : '';
+
+  // Helper to format date
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  // Calculate deadline (submittedAt + 3 working days)
+  const addWorkingDays = (dateStr, days) => {
+    const date = new Date(dateStr);
+    let added = 0;
+    while (added < days) {
+      date.setDate(date.getDate() + 1);
+      const day = date.getDay();
+      if (day !== 0 && day !== 6) { // exclude Saturday (6) and Sunday (0)
+        added++;
+      }
+    }
+    return date;
+  };
+
+  let deadlineDate = '';
+  let deadlineMsg = '';
+  let statusDetails = '';
+
+  if (status === 'accepted') {
+    if (submittedAt) {
+      const deadline = addWorkingDays(submittedAt, 3);
+      deadlineDate = formatDate(deadline);
+      deadlineMsg = `Please submit the required documents on or before <strong>${deadlineDate}</strong> (within 3 working days from the date of this intimation).`;
+    } else {
+      deadlineMsg = 'Please submit the required documents within 3 working days from the date of this intimation.';
+    }
+
+    statusDetails = `
+      <div style="background: #fff3cd; border-left: 4px solid #c9a227; padding: 14px 18px; margin: 16px 0; border-radius: 4px;">
+        <p style="margin: 0; font-weight: 600; color: #856404; font-size: 16px;">
+          ⚠️ Your admission request has been <strong>ACCEPTED</strong>.
+        </p>
+        <p style="margin: 6px 0 0; color: #856404;">
+          However, <strong>your admission is not yet confirmed</strong>. To confirm your seat, you must submit the required documents to the college office in person.
+        </p>
+        <p style="margin: 6px 0 0; color: #856404;">
+          ${deadlineMsg}
+        </p>
+        
+        <p style="margin: 8px 0 0; color: #856404; font-size: 14px;">
+          For any queries, contact the admissions office at 
+          <a href="mailto:${process.env.ADMISSION_EMAIL || 'nicetau2023@gmail.com'}" style="color: #2b7be4; text-decoration: underline;">
+            ${process.env.ADMISSION_EMAIL || 'nicetau2023@gmail.com'}
+          </a> 
+          or call <strong>+91 94888 85995</strong>.
+        </p>
+        <p style="margin: 6px 0 0; color: #856404; font-size: 14px;">
+          <strong>Note:</strong> If we do not receive your documents by the above deadline, your admission offer will be automatically cancelled without further intimation.
+        </p>
+      </div>
+    `;
+  } else {
+    statusDetails = `
+      <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 14px 18px; margin: 16px 0; border-radius: 4px;">
+        <p style="margin: 0; font-weight: 600; color: #721c24; font-size: 16px;">
+          📢 Your application has been <strong>REJECTED</strong>.
+        </p>
+        <p style="margin: 6px 0 0; color: #721c24;">
+          We regret to inform you that your application has not been selected at this time.
+        </p>
+        <p style="margin: 6px 0 0; color: #721c24;">
+          We encourage you to apply again in the future. Thank you for your interest in ${COLLEGE_NAME}.
+        </p>
+      </div>
+    `;
+  }
 
   const html = emailHeader('Application Status Update') + `
     <h2>Application Status Update</h2>
@@ -144,6 +217,7 @@ export async function sendApplicationStatusUpdate(email, name, status, comment) 
     <div style="background: #f7faff; border-radius: 8px; padding: 16px 20px; margin: 20px 0; text-align: center;">
       <span style="font-size: 24px; font-weight: 700; color: ${color};">${statusEmoji} ${statusText}</span>
     </div>
+    ${statusDetails}
     ${comment ? `<div class="details"><p><strong>Admin Remark:</strong> ${comment}</p></div>` : ''}
     <p>We appreciate your interest in our institution. If you have any questions, feel free to contact our admissions office.</p>
     <p>Thank you for applying to ${COLLEGE_NAME}.</p>
@@ -170,6 +244,7 @@ export async function notifyAdminNewApplication(application) {
       <p><strong>Email:</strong> <a href="mailto:${application.email}">${application.email}</a></p>
       <p><strong>Hall Ticket No:</strong> ${application.hallTicketNo}</p>
       <p><strong>Branch Preferred:</strong> ${application.branchPreferred}</p>
+      <p><strong>Department:</strong> ${application.department}</p>
       <p><strong>Admission For:</strong> ${application.admissionFor}</p>
       <p><strong>Cutoff Mark:</strong> ${application.cutoffMark || 'Not provided'}</p>
       <p><strong>Mobile:</strong> ${application.mobile}</p>

@@ -140,6 +140,7 @@ router.post('/submit', async (req, res) => {
       email,
       admissionFor,
       branchPreferred,
+      department,
       cutoffMark,
     } = req.body;
 
@@ -167,7 +168,7 @@ router.post('/submit', async (req, res) => {
     // Validate required fields
     if (!name || !fatherName || !hallTicketNo || !dob || !gender || !religion || !community ||
         !residenceAddress || !permanentAddress || !district || !state || !pincode ||
-        !mobile || !parentMobile || !email || !admissionFor || !branchPreferred) {
+        !mobile || !parentMobile || !email || !admissionFor || !branchPreferred || !department) {
       return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
@@ -202,6 +203,7 @@ router.post('/submit', async (req, res) => {
       email: email.trim(),
       admissionFor: admissionFor.trim(),
       branchPreferred: branchPreferred.trim(),
+      department: department.trim(),
       cutoffMark: cutoff,
       ip,
       emailVerified: true,

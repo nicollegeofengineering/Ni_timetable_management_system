@@ -19,6 +19,7 @@ const admissionApplicationSchema = new mongoose.Schema({
   parentMobile: { type: String, required: true },
   email: { type: String, required: true },
   admissionFor: { type: String, required: true },
+  department: { type: String, required: true },
   branchPreferred: { type: String, required: true },
   cutoffMark: { type: Number, required: false },            // NEW
   emailVerified: { type: Boolean, default: false },

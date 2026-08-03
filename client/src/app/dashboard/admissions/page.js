@@ -210,6 +210,7 @@ export default function AdmissionsPage() {
               <div className={styles.detailRow}><strong>Email:</strong> {selectedApp.email}</div>
               <div className={styles.detailRow}><strong>Admission For:</strong> {selectedApp.admissionFor}</div>
               <div className={styles.detailRow}><strong>Branch:</strong> {selectedApp.branchPreferred}</div>
+                <div className={styles.detailRow}><strong>Department:</strong> {selectedApp.department}</div>
               <div className={styles.detailRow}><strong>Cutoff Mark:</strong> {selectedApp.cutoffMark !== undefined && selectedApp.cutoffMark !== null ? selectedApp.cutoffMark : "—"}</div>
               <div className={styles.detailRow}><strong>Submitted:</strong> {new Date(selectedApp.submittedAt).toLocaleString()}</div>
 
