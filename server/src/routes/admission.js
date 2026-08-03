@@ -49,8 +49,8 @@ router.post('/send-otp', async (req, res) => {
     }
     const ip = req.ip || req.connection.remoteAddress;
 
-    const existing=await admissionApplication.findOne({ email: email.trim() });
-    if(existing){
+    const existing = await AdmissionApplication.findOne({ email: email.trim() });
+    if (existing) {
       return res.status(409).json({ success: false, message: 'This email has already been used for an application.' });
     }
 
