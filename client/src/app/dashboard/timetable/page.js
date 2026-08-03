@@ -420,28 +420,35 @@ export default function TimetablePage() {
   };
 
   // ---------- CORRECTED HALL FILTER ----------
-  // Only blocks halls already booked in the same day AND same period (by any class)
   const filterHalls = (query, dayNum, periodNum, currentKey) => {
-    const assignedHallIds = new Set();
-    Object.entries(entries).forEach(([key, val]) => {
-      if (key === currentKey) return;
-      const parts = key.split("__");
-      const keyDay = parseInt(parts[2]);
-      const keyPeriod = parseInt(parts[3]);
-      if (keyDay === dayNum && keyPeriod === periodNum && val.hall) {
+  const assignedHallIds = new Set();
+  const currentEntry = entries[currentKey] || {};
+  const currentSubjectId = currentEntry.subject?._id;
+
+  Object.entries(entries).forEach(([key, val]) => {
+    if (key === currentKey) return;
+    const parts = key.split("__");
+    const keyDay = parseInt(parts[2]);
+    const keyPeriod = parseInt(parts[3]);
+    if (keyDay === dayNum && keyPeriod === periodNum && val.hall) {
+      const otherSubjectId = val.subject?._id;
+      // Allow sharing if the other slot has the same subject as the current one
+      const sameSubject = currentSubjectId && otherSubjectId && currentSubjectId === otherSubjectId;
+      if (!sameSubject) {
         assignedHallIds.add(val.hall._id);
       }
-    });
+    }
+  });
 
-    let list = hallList.filter((h) => !assignedHallIds.has(h._id));
-    if (!query) return list;
-    const q = query.toUpperCase();
-    return list.filter(
-      (h) =>
-        getHallCode(h).toUpperCase().includes(q) ||
-        getHallName(h).toUpperCase().includes(q)
-    );
-  };
+  let list = hallList.filter((h) => !assignedHallIds.has(h._id));
+  if (!query) return list;
+  const q = query.toUpperCase();
+  return list.filter(
+    (h) =>
+      getHallCode(h).toUpperCase().includes(q) ||
+      getHallName(h).toUpperCase().includes(q)
+  );
+};
 
   // ---------- SUBJECT REFERENCE ----------
   const referenceRows = useMemo(() => {

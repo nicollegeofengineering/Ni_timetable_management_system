@@ -113,7 +113,7 @@
   box-shadow: 0 0 10px rgba(0,0,0,0.1);
   position: relative;
   box-sizing: border-box;
-  overflow: hidden; /* prevent content from spilling out */
+  overflow: hidden;
 }
 
 .header {
@@ -165,23 +165,23 @@
 
 .tableWrapper {
   width: 100%;
-  overflow-x: auto; /* allow horizontal scroll if needed, but we want to fit A4 */
+  overflow-x: auto;
 }
 
 .hallTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9px; /* reduce font size to fit */
-  table-layout: fixed; /* force columns to respect width */
+  font-size: 9px;
+  table-layout: fixed;
 }
 
 .hallTable th,
 .hallTable td {
   border: 1px solid black;
   text-align: center;
-  padding: 6px 4px; /* reduce padding */
+  padding: 6px 4px;
   vertical-align: middle;
-  word-break: break-word; /* prevent long words from overflowing */
+  word-break: break-word;
 }
 
 .dayHead {
@@ -200,13 +200,52 @@
 .periodCell {
   min-width: 30px;
   height: auto;
+  vertical-align: top;
 }
 
 .periodContent {
   display: flex;
   flex-direction: column;
   font-size: 9px;
+  width: 100%;
 }
+
+/* ----- NEW STYLES FOR MERGED SLOTS ----- */
+.mergedSlot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 0;
+  border-bottom: 1px dashed #ddd;
+  width: 100%;
+  word-break: break-word;
+}
+
+.mergedSlot:last-child {
+  border-bottom: none;
+}
+
+.classesList {
+  font-weight: bold;
+  font-size: 8px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.subjectCode {
+  color: #444;
+  font-size: 8px;
+}
+
+.staffCode {
+  font-size: 7px;
+  color: #666;
+}
+/* ----- END NEW STYLES ----- */
 
 .slotItem {
   display: flex;
@@ -222,16 +261,6 @@
 .classInfo {
   font-weight: bold;
   font-size: 8px;
-}
-
-.subjectCode {
-  color: #444;
-  font-size: 8px;
-}
-
-.staffCode {
-  font-size: 7px;
-  color: #666;
 }
 
 .emptyCell {

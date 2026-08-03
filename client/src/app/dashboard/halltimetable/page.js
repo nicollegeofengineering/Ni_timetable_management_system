@@ -101,10 +101,11 @@ export default function HallTimetablePage() {
     );
   }, [hallList, searchQuery]);
 
-  // ---------- GROUP DATA FOR TABLE ----------
+  // ---------- GROUP DATA FOR TABLE (MODIFIED) ----------
   const timetableMatrix = useMemo(() => {
     if (!hallTimetableData.length) return {};
     const matrix = {};
+
     hallTimetableData.forEach(entry => {
       if (!entry.hall || !entry.subject) return;
       const key = `${entry.day}__${entry.period}`;
@@ -112,13 +113,40 @@ export default function HallTimetablePage() {
       matrix[key].push({
         department: entry.department,
         year: entry.year,
+        subjectId: entry.subject._id,
         subjectCode: entry.subject.subjectCode,
         subjectName: entry.subject.subjectName,
-        staffName: entry.staff?.staffName || "",
-        staffCode: entry.staff?.staffCode || "",
+        staffId: entry.staff?._id || '',
+        staffName: entry.staff?.staffName || '',
+        staffCode: entry.staff?.staffCode || '',
       });
     });
-    return matrix;
+
+    // Group by subject+staff within each period
+    const groupedMatrix = {};
+    Object.keys(matrix).forEach(key => {
+      const slots = matrix[key];
+      const groupMap = new Map();
+      slots.forEach(slot => {
+        const groupKey = `${slot.subjectId}_${slot.staffId}`;
+        if (!groupMap.has(groupKey)) {
+          groupMap.set(groupKey, {
+            subjectCode: slot.subjectCode,
+            subjectName: slot.subjectName,
+            staffCode: slot.staffCode,
+            staffName: slot.staffName,
+            classes: [],
+          });
+        }
+        groupMap.get(groupKey).classes.push(`${slot.department} ${slot.year}`);
+      });
+      groupedMatrix[key] = Array.from(groupMap.values()).map(group => ({
+        ...group,
+        classes: group.classes.join(', '), // comma separated
+      }));
+    });
+
+    return groupedMatrix;
   }, [hallTimetableData]);
 
   // ---------- UNIQUE SUBJECTS + STAFF NAMES TAUGHT IN THIS HALL ----------
@@ -433,21 +461,22 @@ export default function HallTimetablePage() {
                         }
 
                         const key = `${dayNum}__${col.period}`;
-                        const slots = timetableMatrix[key] || [];
+                        const groups = timetableMatrix[key] || [];
+
                         return (
                           <td key={idx} className={styles.periodCell}>
                             <div className={styles.periodContent}>
-                              {slots.length > 0 ? (
-                                slots.map((slot, i) => (
-                                  <div key={i} className={styles.slotItem}>
-                                    <span className={styles.classInfo}>
-                                      {slot.department} {slot.year}
+                              {groups.length > 0 ? (
+                                groups.map((group, gi) => (
+                                  <div key={gi} className={styles.mergedSlot}>
+                                    <span className={styles.classesList}>
+                                      {group.classes}
                                     </span>
                                     <span className={styles.subjectCode}>
-                                      {slot.subjectCode}
+                                      {group.subjectCode}
                                     </span>
                                     <span className={styles.staffCode}>
-                                      {slot.staffCode}
+                                      {group.staffCode}
                                     </span>
                                   </div>
                                 ))

@@ -148,25 +148,31 @@ router.put("/upsert", async (req, res) => {
       }
     }
 
-    // 2. Hall conflict (unchanged)
-    if (hall) {
-      const hallConflict = await Timetable.findOne({
-        academicYear,
-        hall,
-        day: dayNum,
-        period: periodNum,
-        _id: { $ne: existing?._id },
-      });
-      if (hallConflict) {
-        const hallDoc = await Hall.findById(hall);
-        const hallName = hallDoc ? hallDoc.hallName : hall;
-        return res.status(409).json({
-          success: false,
-          conflict: "hall",
-          message: `Hall "${hallName}" is already booked for ${hallConflict.department} ${hallConflict.year} (Sem ${hallConflict.semester}) on day ${dayNum}, period ${periodNum}`,
-        });
-      }
+    // 2. Hall conflict — allow sharing if same subject
+  if (hall) {
+    const hallConflictQuery = {
+      academicYear,
+      hall,
+      day: dayNum,
+      period: periodNum,
+      _id: { $ne: existing?._id },
+    };
+    // If a subject is being set, exclude conflicts that have the same subject
+    if (subject) {
+      hallConflictQuery.subject = { $ne: subject };
     }
+
+    const hallConflict = await Timetable.findOne(hallConflictQuery);
+    if (hallConflict) {
+      const hallDoc = await Hall.findById(hall);
+      const hallName = hallDoc ? hallDoc.hallName : hall;
+      return res.status(409).json({
+        success: false,
+        conflict: "hall",
+        message: `Hall "${hallName}" is already booked for ${hallConflict.department} ${hallConflict.year} (Sem ${hallConflict.semester}) on day ${dayNum}, period ${periodNum}`,
+      });
+    }
+  }
 
     // 3. Class conflict (unchanged)
     if (subject) {
