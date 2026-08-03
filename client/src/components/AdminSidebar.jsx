@@ -14,9 +14,8 @@ import {
   LogOut,
   DoorClosed,
 } from "lucide-react";
-import api from "@/lib/api";
 import styles from "./AdminSidebar.module.css";
-import { href } from "react-router-dom";
+
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
