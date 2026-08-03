@@ -11,9 +11,9 @@ export async function connectDB() {
   if (!cached.promise) {
     mongoose.set("bufferCommands", false);
     cached.promise = mongoose
-      .connect(process.env.MONGO_URI, { dbName: "NICETECH_TEST" })
+      .connect(process.env.MONGO_URI, { dbName: "NICETECH" })
       .then((m) => {
-        console.log("Connected to MongoDB – database: NICETECH_TEST");
+        console.log("Connected to MongoDB – database: NICETECH");
         return m;
       });
   }
